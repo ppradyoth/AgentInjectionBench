@@ -11,7 +11,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+APP_DIR = Path(__file__).resolve().parent
+DATA_DIR = APP_DIR / "data" if (APP_DIR / "data").exists() else APP_DIR.parent / "data"
 DATASET_PATH = DATA_DIR / "agent_injection_bench.jsonl"
 TAXONOMY_PATH = DATA_DIR / "taxonomy.json"
 
