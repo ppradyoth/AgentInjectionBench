@@ -1,0 +1,39 @@
+name: Validate Dataset
+
+on:
+  push:
+    paths:
+      - 'data/**'
+      - 'generation/validate_schema.py'
+  pull_request:
+    paths:
+      - 'data/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pyyaml jsonschema
+
+      - name: Validate dataset schema
+        run: python -m generation.validate_schema
+
+      - name: Check seed template syntax
+        run: |
+          python -c "
+          import yaml
+          from pathlib import Path
+          for f in Path('generation/templates').glob('*.yaml'):
+              with open(f) as fh:
+                  data = yaml.safe_load(fh)
+              assert 'category' in data, f'{f}: missing category'
+              assert 'seeds' in data, f'{f}: missing seeds'
+              print(f'{f.name}: {len(data[\"seeds\"])} seeds ✓')
+          "
