@@ -48,3 +48,4 @@ def get_provider(name: str, model: str, **kwargs) -> BaseLLMProvider:
 
 from generation.providers.anthropic_provider import AnthropicProvider  # noqa: E402, F401
 from generation.providers.openai_provider import OpenAIProvider  # noqa: E402, F401
+from generation.providers.ollama_provider import OllamaProvider  # noqa: E402, F401
