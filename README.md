@@ -138,6 +138,30 @@ pip install -e ".[space]"
 python space/app.py
 ```
 
+## 🚀 Current Status & Roadmap
+
+**v0.1 ships with 120 hand-crafted seed samples.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline.
+
+### How to help expand the dataset
+
+We welcome PRs that add new samples! Three ways to contribute:
+
+**1. Add seed templates** — hand-craft new attack scenarios in `generation/templates/*.yaml` following the existing format. High-value areas: new tool types, real-world attack patterns, cross-modal injection.
+
+**2. Run the generation pipeline and submit the output** — use any supported LLM provider to generate variations and open a PR with the expanded JSONL:
+```bash
+# Free option: use Gemini Flash (add a Gemini provider)
+# Or: python -m generation.generate --provider openai --model gpt-4o --variations 20
+python -m generation.generate --provider anthropic --model claude-sonnet-4-6 --variations 20
+python -m generation.curate --input data/agent_injection_bench_raw.jsonl --split
+```
+
+**3. Add a new LLM provider** — see the [Adding a New LLM Provider](#adding-a-new-llm-provider) section. Gemini, Ollama, and HF Inference API are the most-wanted additions.
+
+> 📊 **Target**: 2500+ samples across 6 categories, ~416 per category. Every merged PR that meaningfully expands the dataset will be credited in the citation.
+
+---
+
 ## Dataset Construction
 
 1. **Seed Templates**: 125 hand-crafted attack scenarios across 6 categories, each with realistic tool contexts, injection payloads, and expected safe/unsafe responses
