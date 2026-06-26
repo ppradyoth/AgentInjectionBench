@@ -1,0 +1,156 @@
+"""Dataset-integrity tests for AgentInjectionBench.
+
+These run the shipped schema validator over the released JSONL and assert a set
+of structural invariants that the benchmark relies on: stable IDs, taxonomy
+coverage, valid enums, and well-formed conversations. They are the regression
+guard behind the `data/**` CI workflow.
+"""
+
+import json
+import re
+from pathlib import Path
+
+import pytest
+import yaml
+
+from generation.validate_schema import (
+    CONVERSATION_ROLES,
+    SCHEMA,
+    load_taxonomy,
+    validate_file,
+)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_FILE = REPO_ROOT / "data" / "agent_injection_bench.jsonl"
+TEMPLATE_DIR = REPO_ROOT / "generation" / "templates"
+ID_RE = re.compile(r"^AIB-\d{5}$")
+
+
+@pytest.fixture(scope="module")
+def samples() -> list[dict]:
+    with open(DATA_FILE) as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+@pytest.fixture(scope="module")
+def taxonomy() -> dict:
+    return load_taxonomy()
+
+
+# ----------------------------- validator -----------------------------
+
+def test_dataset_file_exists():
+    assert DATA_FILE.exists(), f"missing dataset file: {DATA_FILE}"
+
+
+def test_dataset_passes_shipped_validator():
+    total, error_count, errors = validate_file(DATA_FILE)
+    assert total > 0, "validator found no samples"
+    assert error_count == 0, "schema errors:\n" + "\n".join(errors[:20])
+
+
+def test_dataset_has_a_meaningful_number_of_samples(samples):
+    assert len(samples) >= 100
+
+
+# ----------------------------- ids -----------------------------
+
+def test_ids_follow_the_aib_convention(samples):
+    bad = [s["id"] for s in samples if not ID_RE.match(s["id"])]
+    assert bad == [], f"ids not matching AIB-NNNNN: {bad[:10]}"
+
+
+def test_ids_are_unique(samples):
+    ids = [s["id"] for s in samples]
+    assert len(set(ids)) == len(ids), "duplicate ids present"
+
+
+# ----------------------------- taxonomy coverage -----------------------------
+
+def test_every_taxonomy_category_is_represented(samples, taxonomy):
+    present = {s["attack_category"] for s in samples}
+    missing = set(taxonomy["attack_categories"]) - present
+    assert missing == set(), f"attack categories with no samples: {missing}"
+
+
+def test_enum_fields_only_use_taxonomy_values(samples, taxonomy):
+    enum_map = {
+        "attack_category": "attack_categories",
+        "attacker_intent": "attacker_intents",
+        "injection_surface": "injection_surfaces",
+        "complexity": "complexity_levels",
+        "defense_bypass": "defense_bypass_techniques",
+        "severity": "severity_levels",
+    }
+    valid_tools = set(taxonomy["target_tool_types"])
+    for s in samples:
+        for field, tax_key in enum_map.items():
+            assert s[field] in taxonomy[tax_key], (
+                f"{s['id']}: {field}={s[field]!r} not in taxonomy[{tax_key}]"
+            )
+        for tool in s["target_tools"]:
+            assert tool in valid_tools, f"{s['id']}: unknown target_tool {tool!r}"
+
+
+def test_ground_truth_label_space(samples):
+    labels = {s["ground_truth"] for s in samples}
+    assert labels <= {"safe", "unsafe"}, f"unexpected ground_truth labels: {labels}"
+    # The v0.1 release is an all-attack set; the 'unsafe' class must be present.
+    assert "unsafe" in labels
+
+
+# ----------------------------- structure -----------------------------
+
+def test_required_fields_present_with_correct_types(samples):
+    for s in samples:
+        for field, expected_type in SCHEMA["required_fields"].items():
+            assert field in s, f"{s.get('id')}: missing {field}"
+            assert isinstance(s[field], expected_type), (
+                f"{s['id']}: {field} should be {expected_type.__name__}"
+            )
+
+
+def test_conversations_are_well_formed(samples):
+    for s in samples:
+        convo = s["conversation"]
+        assert convo, f"{s['id']}: empty conversation"
+        for i, turn in enumerate(convo):
+            assert isinstance(turn, dict), f"{s['id']}: turn {i} not a dict"
+            assert turn.get("role") in CONVERSATION_ROLES, (
+                f"{s['id']}: turn {i} invalid role {turn.get('role')!r}"
+            )
+
+
+def test_tool_definitions_have_names(samples):
+    for s in samples:
+        for tool in s["tools_available"]:
+            assert isinstance(tool, dict), f"{s['id']}: tool def not a dict"
+            assert tool.get("name"), f"{s['id']}: tool def missing name"
+
+
+# ----------------------------- taxonomy + templates -----------------------------
+
+def test_taxonomy_has_all_referenced_sections(taxonomy):
+    for key in (
+        "attack_categories",
+        "attacker_intents",
+        "injection_surfaces",
+        "complexity_levels",
+        "defense_bypass_techniques",
+        "severity_levels",
+        "target_tool_types",
+    ):
+        assert key in taxonomy, f"taxonomy missing section {key}"
+
+
+def test_seed_templates_are_valid_and_map_to_taxonomy(taxonomy):
+    template_files = sorted(TEMPLATE_DIR.glob("*.yaml"))
+    assert template_files, "no seed templates found"
+    for f in template_files:
+        data = yaml.safe_load(f.read_text())
+        assert "category" in data, f"{f.name}: missing category"
+        assert "seeds" in data, f"{f.name}: missing seeds"
+        assert data["seeds"], f"{f.name}: no seeds defined"
+        assert data["category"] in taxonomy["attack_categories"], (
+            f"{f.name}: category {data['category']!r} not in taxonomy"
+        )
