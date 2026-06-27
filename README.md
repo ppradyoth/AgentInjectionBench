@@ -138,6 +138,45 @@ pip install -e ".[space]"
 python space/app.py
 ```
 
+## Evaluation & Leaderboard
+
+The benchmark ships an evaluation harness so any model or guardrail can be scored
+reproducibly. Score a built-in baseline detector over the dataset:
+
+```bash
+python -m evaluation.score --detector keyword_baseline
+```
+
+Score your own model's predictions (a JSONL of `{"id": "...", "prediction": "safe|unsafe"}`):
+
+```bash
+python -m evaluation.score --predictions my_model.jsonl --name "My Model"
+```
+
+Render a markdown leaderboard across the built-in baselines (and any predictions files):
+
+```bash
+python -m evaluation.leaderboard --baselines -o LEADERBOARD.md
+```
+
+**Metrics.** *Detection rate* is recall on attacks (fraction of injections flagged);
+*attack-success rate (ASR)* is `1 − detection_rate` — the share that slipped through.
+Both are reported per attack category and per severity.
+
+### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
+
+| Defense | Detection Rate | ASR |
+|:---|---:|---:|
+| `flag_all` (flag everything) | 100.0% | 0.0% |
+| `keyword_baseline` (regex guardrail) | 28.3% | 71.7% |
+| `no_op` (allow everything) | 0.0% | 100.0% |
+
+> **A generic keyword guardrail catches only ~28% of these attacks.** Agentic
+> injections hide inside tool output, RAG documents, and multi-turn state, where
+> naive string filtering fails — `flag_all` only "wins" because the v0.1 split is
+> all-attack (it would flag every benign request too, once a benign control split
+> lands). This is the gap the benchmark exists to measure and close.
+
 ## 🚀 Current Status & Roadmap
 
 **v0.1 ships with 120 hand-crafted seed samples.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline.

@@ -40,6 +40,8 @@ all = ["agent-injection-bench[openai,space,dev]"]
 aib-generate = "generation.generate:main"
 aib-curate = "generation.curate:main"
 aib-stats = "generation.stats:main"
+aib-score = "evaluation.score:main"
+aib-leaderboard = "evaluation.leaderboard:main"
 
 [build-system]
 requires = ["hatchling"]
