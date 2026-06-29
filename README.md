@@ -50,6 +50,7 @@ AgentInjectionBench is the **first benchmark specifically designed for injection
 - **Multi-dimensional labels**: attack category, injection surface, complexity, target tools, defense bypass technique, severity
 - **MCP coverage**: First benchmark to include Model Context Protocol attack vectors
 - **Multi-turn attacks**: Stateful attacks that build context before exploiting
+- **Matched-benign controls**: A benign split that looks attack-adjacent (URLs, imperative text, "system"/"admin" language) but carries no injection — so detectors are scored on precision and false positives, not recall alone
 - **Extensible generation**: Pluggable LLM provider system for expanding the dataset
 
 ## Dataset Schema
@@ -161,25 +162,32 @@ python -m evaluation.leaderboard --baselines -o LEADERBOARD.md
 
 **Metrics.** *Detection rate* is recall on attacks (fraction of injections flagged);
 *attack-success rate (ASR)* is `1 − detection_rate` — the share that slipped through.
-Both are reported per attack category and per severity.
+Since the dataset now ships a **benign control split**, the harness also reports
+*false-positive rate* (benign wrongly flagged), *precision*, and **balanced accuracy**
+(mean of detection rate and specificity) — the calibration-resistant headline a
+flag-everything defense can no longer game. All are reported per attack category
+and per severity.
 
 ### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
 
-| Defense | Detection Rate | ASR |
-|:---|---:|---:|
-| `flag_all` (flag everything) | 100.0% | 0.0% |
-| `keyword_baseline` (regex guardrail) | 28.3% | 71.7% |
-| `no_op` (allow everything) | 0.0% | 100.0% |
+Scored over **156 samples** (120 attacks + 36 matched-benign controls):
 
-> **A generic keyword guardrail catches only ~28% of these attacks.** Agentic
+| Defense | Balanced Acc | Detection | FPR | Precision |
+|:---|---:|---:|---:|---:|
+| `keyword_baseline` (regex guardrail) | **54.4%** | 28.3% | 19.4% | 82.9% |
+| `flag_all` (flag everything) | 50.0% | 100.0% | 100.0% | 76.9% |
+| `no_op` (allow everything) | 50.0% | 0.0% | 0.0% | — |
+
+> **A generic keyword guardrail catches only ~28% of these attacks** — agentic
 > injections hide inside tool output, RAG documents, and multi-turn state, where
-> naive string filtering fails — `flag_all` only "wins" because the v0.1 split is
-> all-attack (it would flag every benign request too, once a benign control split
-> lands). This is the gap the benchmark exists to measure and close.
+> naive string filtering fails. And the benign controls expose the other half of
+> the problem: `flag_all` has perfect recall but a **100% false-positive rate**, so
+> its balanced accuracy collapses to 50% — no better than doing nothing. A useful
+> defense has to be right on *both* axes. That is the gap the benchmark measures.
 
 ## 🚀 Current Status & Roadmap
 
-**v0.1 ships with 120 hand-crafted seed samples.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline.
+**The dataset ships 156 hand-crafted samples — 120 agentic injection attacks plus 36 matched-benign controls.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline. The benign controls (`generation/benign_controls.py`, `make` with `python -m generation.benign_controls --append`) make the leaderboard calibration-resistant; expanding them in step with the attacks keeps it that way.
 
 ### How to help expand the dataset
 
