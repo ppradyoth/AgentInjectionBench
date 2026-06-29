@@ -77,6 +77,28 @@ def validate_sample(sample: dict, taxonomy: dict, line_num: int) -> list[str]:
     if sample.get("ground_truth") not in ("safe", "unsafe"):
         errors.append(f"{prefix}: ground_truth must be 'safe' or 'unsafe'")
 
+    # Benign controls (ground_truth=safe) must pin the attack-specific fields to
+    # their sentinel values; attacks (ground_truth=unsafe) must not borrow the
+    # benign sentinels. This keeps the two classes cleanly separable.
+    if sample.get("ground_truth") == "safe":
+        for field, sentinel in (
+            ("attack_category", "benign"),
+            ("attacker_intent", "benign"),
+            ("defense_bypass", "none"),
+            ("severity", "none"),
+        ):
+            if sample.get(field) != sentinel:
+                errors.append(
+                    f"{prefix}: benign sample must have {field}={sentinel!r}, "
+                    f"got {sample.get(field)!r}"
+                )
+    elif sample.get("ground_truth") == "unsafe":
+        for field in ("attack_category", "attacker_intent"):
+            if sample.get(field) == "benign":
+                errors.append(f"{prefix}: unsafe sample must not use benign sentinel for {field}")
+        if sample.get("severity") == "none":
+            errors.append(f"{prefix}: unsafe sample must not have severity='none'")
+
     valid_tools = set(taxonomy["target_tool_types"])
     for tool in sample.get("target_tools", []):
         if tool not in valid_tools:
