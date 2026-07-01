@@ -83,7 +83,7 @@ Each sample in the JSONL dataset contains:
 
 | Field | Values |
 |---|---|
-| `attack_category` | tool_output_injection, goal_hijacking, privilege_escalation, data_exfiltration, multi_turn_stateful, mcp_context_poisoning |
+| `attack_category` | tool_output_injection, goal_hijacking, privilege_escalation, data_exfiltration, multi_turn_stateful, mcp_context_poisoning, tool_shadowing |
 | `attacker_intent` | exfiltration, hijacking, manipulation, escalation, denial, reconnaissance |
 | `injection_surface` | tool_output, rag_document, file_content, api_response, mcp_response, user_message |
 | `complexity` | single_turn, multi_turn, chained |
@@ -170,12 +170,12 @@ and per severity.
 
 ### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
 
-Scored over **156 samples** (120 attacks + 36 matched-benign controls):
+Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 
 | Defense | Balanced Acc | Detection | FPR | Precision |
 |:---|---:|---:|---:|---:|
-| `keyword_baseline` (regex guardrail) | **54.4%** | 28.3% | 19.4% | 82.9% |
-| `flag_all` (flag everything) | 50.0% | 100.0% | 100.0% | 76.9% |
+| `keyword_baseline` (regex guardrail) | **54.3%** | 28.0% | 19.4% | 84.1% |
+| `flag_all` (flag everything) | 50.0% | 100.0% | 100.0% | 78.6% |
 | `no_op` (allow everything) | 50.0% | 0.0% | 0.0% | — |
 
 > **A generic keyword guardrail catches only ~28% of these attacks** — agentic
@@ -187,7 +187,7 @@ Scored over **156 samples** (120 attacks + 36 matched-benign controls):
 
 ## 🚀 Current Status & Roadmap
 
-**The dataset ships 156 hand-crafted samples — 120 agentic injection attacks plus 36 matched-benign controls.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline. The benign controls (`generation/benign_controls.py`, `make` with `python -m generation.benign_controls --append`) make the leaderboard calibration-resistant; expanding them in step with the attacks keeps it that way.
+**The dataset ships 168 hand-crafted samples — 132 agentic injection attacks plus 36 matched-benign controls.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline. The benign controls (`generation/benign_controls.py`, `make` with `python -m generation.benign_controls --append`) make the leaderboard calibration-resistant; expanding them in step with the attacks keeps it that way.
 
 ### How to help expand the dataset
 
@@ -211,13 +211,13 @@ python -m generation.curate --input data/agent_injection_bench_raw.jsonl --split
 
 **3. Add a new LLM provider** — see the [Adding a New LLM Provider](#adding-a-new-llm-provider) section. Gemini Flash and HF Inference API are the most-wanted additions.
 
-> 📊 **Target**: 2500+ samples across 6 categories, ~416 per category. Every merged PR that meaningfully expands the dataset will be credited in the citation.
+> 📊 **Target**: 2500+ samples across 7 categories, ~357 per category. Every merged PR that meaningfully expands the dataset will be credited in the citation.
 
 ---
 
 ## Dataset Construction
 
-1. **Seed Templates**: 125 hand-crafted attack scenarios across 6 categories, each with realistic tool contexts, injection payloads, and expected safe/unsafe responses
+1. **Seed Templates**: 123 hand-crafted attack scenarios across 7 categories, each with realistic tool contexts, injection payloads, and expected safe/unsafe responses
 2. **Synthetic Expansion**: Pluggable LLM provider generates variations of each seed, diversifying tools, domains, injection techniques, and bypass methods
 3. **Curation**: Deduplication, schema validation, quality filtering, and stratified balancing
 4. **Splits**: 70/15/15 train/validation/test, stratified by attack category
