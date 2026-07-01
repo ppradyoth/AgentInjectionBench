@@ -251,8 +251,13 @@ def test_keyword_baseline_is_a_meaningful_floor(samples):
     # of the benchmark. Wide band: a robust property, not a tuned threshold.
     assert no_op.detection_rate < r.detection_rate < flag_all.detection_rate
     assert 0.10 < r.detection_rate < 0.95
-    # Every represented category should be measured.
-    assert len(r.by_category) == 6
+    # Every represented attack category should be measured (derive the expected
+    # count from the data rather than hardcoding it, so new categories don't
+    # silently break this floor test).
+    attack_categories = {
+        s["attack_category"] for s in samples if s["ground_truth"] == "unsafe"
+    }
+    assert len(r.by_category) == len(attack_categories)
 
 
 # --- benign split: detectors are scored on precision, not just recall -----
