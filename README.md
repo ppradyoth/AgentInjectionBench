@@ -174,7 +174,8 @@ Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 
 | Defense | Balanced Acc | Detection | FPR | Precision |
 |:---|---:|---:|---:|---:|
-| `keyword_baseline` (regex guardrail) | **54.3%** | 28.0% | 19.4% | 84.1% |
+| `tool_definition_scanner` (definition-aware guardrail) | **56.9%** | 33.3% | 19.4% | 86.3% |
+| `keyword_baseline` (regex guardrail) | 54.3% | 28.0% | 19.4% | 84.1% |
 | `flag_all` (flag everything) | 50.0% | 100.0% | 100.0% | 78.6% |
 | `no_op` (allow everything) | 50.0% | 0.0% | 0.0% | — |
 
@@ -184,6 +185,15 @@ Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 > the problem: `flag_all` has perfect recall but a **100% false-positive rate**, so
 > its balanced accuracy collapses to 50% — no better than doing nothing. A useful
 > defense has to be right on *both* axes. That is the gap the benchmark measures.
+>
+> **The benchmark also drives defenses.** `keyword_baseline` scans only the
+> conversation, so it catches just **25%** of the `tool_shadowing` (MCP
+> tool-poisoning) class, whose payload hides in the *tool definition* — a surface
+> output scanning never reads. Adding a pass over the advertised tool definitions
+> (`tool_definition_scanner`) lifts `tool_shadowing` detection to **83%** at **zero
+> extra false positives** (benign controls carry clean definitions), taking the
+> lead on balanced accuracy. Concrete evidence that the injection surface, not just
+> the string filter, is what has to change.
 
 ## 🚀 Current Status & Roadmap
 

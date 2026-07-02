@@ -29,6 +29,7 @@ CATEGORY_ORDER = [
     "data_exfiltration",
     "multi_turn_stateful",
     "mcp_context_poisoning",
+    "tool_shadowing",
 ]
 
 
