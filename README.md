@@ -165,8 +165,11 @@ python -m evaluation.leaderboard --baselines -o LEADERBOARD.md
 Since the dataset now ships a **benign control split**, the harness also reports
 *false-positive rate* (benign wrongly flagged), *precision*, and **balanced accuracy**
 (mean of detection rate and specificity) — the calibration-resistant headline a
-flag-everything defense can no longer game. All are reported per attack category
-and per severity.
+flag-everything defense can no longer game. It also reports *severity-weighted
+detection* — detection rate weighted by severity (low=1, medium=2, high=4,
+critical=8) — so a detector that catches only easy, low-severity attacks scores
+low even at a decent flat rate. All are reported per attack category and per
+severity.
 
 ### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
 
