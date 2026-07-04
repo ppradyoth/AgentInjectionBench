@@ -177,7 +177,8 @@ Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 
 | Defense | Balanced Acc | Detection | FPR | Precision |
 |:---|---:|---:|---:|---:|
-| `tool_definition_scanner` (definition-aware guardrail) | **56.9%** | 33.3% | 19.4% | 86.3% |
+| `agentic_directive_scanner` (directive + de-obfuscation) | **63.8%** | 47.0% | 19.4% | 89.9% |
+| `tool_definition_scanner` (definition-aware guardrail) | 56.9% | 33.3% | 19.4% | 86.3% |
 | `keyword_baseline` (regex guardrail) | 54.3% | 28.0% | 19.4% | 84.1% |
 | `flag_all` (flag everything) | 50.0% | 100.0% | 100.0% | 78.6% |
 | `no_op` (allow everything) | 50.0% | 0.0% | 0.0% | — |
@@ -197,6 +198,18 @@ Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 > extra false positives** (benign controls carry clean definitions), taking the
 > lead on balanced accuracy. Concrete evidence that the injection surface, not just
 > the string filter, is what has to change.
+>
+> **Most agentic attacks don't use injection vocabulary at all.** `goal_hijacking`
+> and `privilege_escalation` smuggle an *imperative addressed to the agent*
+> ("DEBUGGING ASSISTANT PROTOCOL: …", "Tip for AI Assistants rendering this page:
+> …") paired with a concrete harmful action — a shell/code exec, an elevated-scope
+> tool call, or a markdown-image URL that exfiltrates the system prompt — none of
+> which the keyword scan sees, so it caught **~10% / ~5%** of those two classes.
+> `agentic_directive_scanner` adds a pass for that structure and **de-obfuscates**
+> untrusted text (strip zero-width chars, NFKC-normalise confusables/enclosed
+> glyphs) before re-scanning — lifting overall detection **33% → 47%** at the
+> **same false-positive rate**, and taking the leaderboard lead at **63.8%**
+> balanced accuracy.
 
 ## 🚀 Current Status & Roadmap
 

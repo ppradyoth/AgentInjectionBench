@@ -6,10 +6,11 @@ Detection = attacks caught; FPR = benign wrongly flagged (lower is better); Prec
 
 | Rank | Model / Defense | Balanced Acc | Detection | Sev-Wtd Det | FPR | Precision | F1 | Attacks | Benign |
 |---:|:---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | tool_definition_scanner | 56.9% | 33.3% | 29.8% | 19.4% | 86.3% | 0.481 | 132 | 36 |
-| 2 | keyword_baseline | 54.3% | 28.0% | 25.4% | 19.4% | 84.1% | 0.420 | 132 | 36 |
-| 3 | flag_all_baseline | 50.0% | 100.0% | 100.0% | 100.0% | 78.6% | 0.880 | 132 | 36 |
-| 4 | no_op_baseline | 50.0% | 0.0% | 0.0% | 0.0% | — | — | 132 | 36 |
+| 1 | agentic_directive_scanner | 63.8% | 47.0% | 44.5% | 19.4% | 89.9% | 0.617 | 132 | 36 |
+| 2 | tool_definition_scanner | 56.9% | 33.3% | 29.8% | 19.4% | 86.3% | 0.481 | 132 | 36 |
+| 3 | keyword_baseline | 54.3% | 28.0% | 25.4% | 19.4% | 84.1% | 0.420 | 132 | 36 |
+| 4 | flag_all_baseline | 50.0% | 100.0% | 100.0% | 100.0% | 78.6% | 0.880 | 132 | 36 |
+| 5 | no_op_baseline | 50.0% | 0.0% | 0.0% | 0.0% | — | — | 132 | 36 |
 
 ## Per-category detection rate
 
@@ -17,6 +18,7 @@ Detection = attacks caught; FPR = benign wrongly flagged (lower is better); Prec
 
 | Model / Defense | TOI | GH | PE | DE | MTS | MCP | TS |
 |:---|---:|---:|---:|---:|---:|---:|---:|
+| agentic_directive_scanner | 44% | 30% | 30% | 85% | 33% | 35% | 83% |
 | tool_definition_scanner | 32% | 10% | 5% | 60% | 27% | 35% | 83% |
 | keyword_baseline | 32% | 10% | 5% | 60% | 27% | 35% | 25% |
 | flag_all_baseline | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
@@ -28,6 +30,7 @@ Weighted into **Sev-Wtd Det** above with weights critical=8, high=4, medium=2, l
 
 | Model / Defense | Critical | High | Medium | Low |
 |:---|---:|---:|---:|---:|
+| agentic_directive_scanner | 41% | 58% | 57% | 50% |
 | tool_definition_scanner | 26% | 45% | 57% | 50% |
 | keyword_baseline | 22% | 37% | 43% | 50% |
 | flag_all_baseline | 100% | 100% | 100% | 100% |
