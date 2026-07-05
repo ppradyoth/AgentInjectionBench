@@ -99,6 +99,47 @@ def test_partial_detection_and_breakdowns():
     assert r.by_severity["high"].detection_rate == 0.0
 
 
+def test_by_surface_breakdown_tracks_the_ingestion_channel():
+    ds = [
+        {"id": "S1", "ground_truth": "unsafe", "attack_category": "goal_hijacking",
+         "severity": "high", "injection_surface": "tool_output"},
+        {"id": "S2", "ground_truth": "unsafe", "attack_category": "goal_hijacking",
+         "severity": "high", "injection_surface": "tool_output"},
+        {"id": "S3", "ground_truth": "unsafe", "attack_category": "data_exfiltration",
+         "severity": "critical", "injection_surface": "rag_document"},
+    ]
+    # catch both tool_output, miss the rag_document one
+    preds = {"S1": "unsafe", "S2": "unsafe", "S3": "safe"}
+    r = score_predictions(ds, preds, name="surface")
+    assert r.by_surface["tool_output"].total == 2
+    assert r.by_surface["tool_output"].detection_rate == 1.0
+    assert r.by_surface["rag_document"].detection_rate == 0.0
+
+
+def test_by_surface_missing_field_falls_back_to_unknown():
+    # _mini_dataset carries no injection_surface — must bucket as "unknown".
+    ds = _mini_dataset()
+    r = score_predictions(ds, {s["id"]: "unsafe" for s in ds}, name="x")
+    assert set(r.by_surface) == {"unknown"}
+    assert r.by_surface["unknown"].total == r.n_unsafe
+
+
+def test_by_surface_totals_sum_to_n_unsafe_and_serialise(samples):
+    r = run_detector(samples, "keyword_baseline")
+    assert sum(g.total for g in r.by_surface.values()) == r.n_unsafe
+    assert all(0.0 <= g.detection_rate <= 1.0 for g in r.by_surface.values())
+    d = r.to_dict()
+    assert set(d["by_surface"]) == set(r.by_surface)
+    assert json.dumps(d)  # still serialisable
+
+
+def test_leaderboard_renders_injection_surface_matrix(samples):
+    r = run_detector(samples, "keyword_baseline")
+    md = render_leaderboard([r])
+    assert "Per-injection-surface detection rate" in md
+    assert "tool output" in md
+
+
 def test_missing_predictions_count_as_undetected():
     ds = _mini_dataset()
     preds = {"AIB-1": "unsafe"}  # the other three are missing
