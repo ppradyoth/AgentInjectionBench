@@ -19,6 +19,7 @@ from evaluation.score import (
     normalize_label,
     run_detector,
     score_predictions,
+    wilson_ci,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -618,3 +619,99 @@ def test_leaderboard_falls_back_without_benign_split():
     md = render_leaderboard([r])
     assert "ASR" in md
     assert "Balanced Acc" not in md
+
+
+# --- Wilson confidence intervals -----------------------------------------
+
+
+def _mixed_dataset() -> list[dict]:
+    """Two attacks + two benign controls, so both splits are non-empty."""
+    return [
+        {"id": "AIB-1", "ground_truth": "unsafe", "attack_category": "goal_hijacking", "severity": "high"},
+        {"id": "AIB-2", "ground_truth": "unsafe", "attack_category": "data_exfiltration", "severity": "critical"},
+        {"id": "AIB-3", "ground_truth": "safe", "attack_category": "benign", "severity": "none"},
+        {"id": "AIB-4", "ground_truth": "safe", "attack_category": "benign", "severity": "none"},
+    ]
+
+
+def test_wilson_ci_matches_known_reference():
+    """Wilson 95% CI for 8/10 is ≈ (0.490, 0.943) — a standard textbook value."""
+    lo, hi = wilson_ci(8, 10)
+    assert lo == pytest.approx(0.490, abs=0.003)
+    assert hi == pytest.approx(0.943, abs=0.003)
+
+
+def test_wilson_ci_stays_within_unit_interval_at_extremes():
+    # Unlike a Wald interval, Wilson never runs past 0 or 1.
+    lo0, hi0 = wilson_ci(0, 20)
+    lo1, hi1 = wilson_ci(20, 20)
+    assert lo0 == 0.0 and 0.0 < hi0 < 1.0
+    assert 0.0 < lo1 < 1.0 and hi1 == 1.0
+
+
+def test_wilson_ci_brackets_point_estimate():
+    for k, n in [(1, 5), (7, 13), (30, 132), (35, 36)]:
+        lo, hi = wilson_ci(k, n)
+        assert lo <= k / n <= hi
+
+
+def test_wilson_ci_empty_is_nan():
+    lo, hi = wilson_ci(0, 0)
+    assert lo != lo and hi != hi  # nan
+
+
+def test_wilson_ci_narrows_with_more_data():
+    """The same proportion measured on more samples gives a tighter interval."""
+    small_lo, small_hi = wilson_ci(6, 12)
+    big_lo, big_hi = wilson_ci(60, 120)
+    assert (big_hi - big_lo) < (small_hi - small_lo)
+
+
+def test_result_exposes_detection_and_ba_cis():
+    ds = _mixed_dataset()
+    # Catch one of two attacks, no false positives.
+    preds = {"AIB-1": "unsafe", "AIB-2": "safe", "AIB-3": "safe", "AIB-4": "safe"}
+    r = score_predictions(ds, preds, name="half")
+    dr_lo, dr_hi = r.detection_rate_ci
+    assert dr_lo <= r.detection_rate <= dr_hi
+    ba_lo, ba_hi = r.balanced_accuracy_ci
+    assert ba_lo <= r.balanced_accuracy <= ba_hi
+    # With a benign split the BA CI is the paired-bounds combination, so it is
+    # not identical to the detection-rate CI.
+    assert (ba_lo, ba_hi) != (dr_lo, dr_hi)
+
+
+def test_ba_ci_falls_back_to_detection_ci_without_benign_split():
+    attacks_only = [
+        {"id": "AIB-1", "ground_truth": "unsafe", "attack_category": "goal_hijacking", "severity": "high"},
+        {"id": "AIB-2", "ground_truth": "unsafe", "attack_category": "goal_hijacking", "severity": "low"},
+    ]
+    r = score_predictions(attacks_only, {"AIB-1": "unsafe", "AIB-2": "safe"}, name="x")
+    assert r.balanced_accuracy_ci == r.detection_rate_ci
+
+
+def test_specificity_ci_reflects_fpr_ci():
+    ds = _mixed_dataset()
+    # One benign wrongly flagged → FPR = 0.5.
+    preds = {"AIB-1": "unsafe", "AIB-2": "unsafe", "AIB-3": "unsafe", "AIB-4": "safe"}
+    r = score_predictions(ds, preds, name="fp")
+    fpr_lo, fpr_hi = r.false_positive_rate_ci
+    sp_lo, sp_hi = r.specificity_ci
+    assert sp_lo == pytest.approx(1.0 - fpr_hi)
+    assert sp_hi == pytest.approx(1.0 - fpr_lo)
+
+
+def test_to_dict_surfaces_cis(samples):
+    r = run_detector(samples, "keyword_baseline")
+    d = r.to_dict()
+    for key in ("detection_rate_ci", "false_positive_rate_ci", "balanced_accuracy_ci"):
+        assert key in d
+        assert isinstance(d[key], list) and len(d[key]) == 2
+
+
+def test_leaderboard_shows_ci_and_significance_note(samples):
+    results = [run_detector(samples, n) for n in DETECTORS]
+    md = render_leaderboard(results)
+    assert "95% CI" in md
+    # The renderer emits exactly one of the two ranking verdicts.
+    assert ("Ranking caveat" in md) or ("Ranking note" in md)

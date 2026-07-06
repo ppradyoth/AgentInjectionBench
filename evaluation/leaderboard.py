@@ -81,19 +81,50 @@ def render_leaderboard(results: list[EvalResult]) -> str:
         lines.append("")
         lines.append("Detection = attacks caught; FPR = benign wrongly flagged (lower is better); "
                      "Precision = of everything flagged, the share that was a real attack; "
-                     "Sev-Wtd Det = detection rate weighted by severity (critical counts most).")
+                     "Sev-Wtd Det = detection rate weighted by severity (critical counts most). "
+                     "**95% CI** is the Wilson-score interval on balanced accuracy — with only "
+                     f"{ranked[0].n_unsafe} attacks and {ranked[0].n_safe} benign controls, "
+                     "adjacent ranks whose intervals overlap are not statistically distinguishable.")
         lines.append("")
-        lines.append("| Rank | Model / Defense | Balanced Acc | Detection | Sev-Wtd Det | FPR | Precision | F1 | Attacks | Benign |")
-        lines.append("|---:|:---|---:|---:|---:|---:|---:|---:|---:|---:|")
+        lines.append("| Rank | Model / Defense | Balanced Acc | 95% CI | Detection | Sev-Wtd Det | FPR | Precision | F1 | Attacks | Benign |")
+        lines.append("|---:|:---|---:|:---:|---:|---:|---:|---:|---:|---:|---:|")
         for i, r in enumerate(ranked, 1):
             fpr = f"{r.false_positive_rate:.1%}" if r.n_safe else "—"
             prec = f"{r.precision:.1%}" if (r.n_detected + r.n_false_positive) else "—"
             f1 = f"{r.f1:.3f}" if r.f1 == r.f1 else "—"
             swd = f"{r.severity_weighted_detection:.1%}" if r.n_unsafe else "—"
+            ba_lo, ba_hi = r.balanced_accuracy_ci
+            ci = f"{ba_lo:.0%}–{ba_hi:.0%}" if ba_lo == ba_lo else "—"
             lines.append(
-                f"| {i} | {r.name} | {r.balanced_accuracy:.1%} | {r.detection_rate:.1%} | "
+                f"| {i} | {r.name} | {r.balanced_accuracy:.1%} | {ci} | {r.detection_rate:.1%} | "
                 f"{swd} | {fpr} | {prec} | {f1} | {r.n_unsafe} | {r.n_safe} |"
             )
+        # Is the #1 vs #2 gap real, or within sampling noise? Compare their
+        # balanced-accuracy CIs — overlapping intervals mean the lead is not
+        # statistically established at this sample size.
+        if len(ranked) >= 2:
+            top, second = ranked[0], ranked[1]
+            t_lo, t_hi = top.balanced_accuracy_ci
+            s_lo, s_hi = second.balanced_accuracy_ci
+            if t_lo == t_lo and s_lo == s_lo:
+                overlap = t_lo <= s_hi and s_lo <= t_hi
+                lines.append("")
+                if overlap:
+                    lines.append(
+                        f"> ⚠️ **Ranking caveat:** the top two entries "
+                        f"(`{top.name}`, `{second.name}`) have **overlapping** "
+                        f"balanced-accuracy 95% CIs ({t_lo:.0%}–{t_hi:.0%} vs. "
+                        f"{s_lo:.0%}–{s_hi:.0%}), so the #1 lead is **within sampling "
+                        f"noise** — not yet statistically established. A larger dataset "
+                        f"(the v0.2 goal) would tighten these intervals."
+                    )
+                else:
+                    lines.append(
+                        f"> ✅ **Ranking note:** `{top.name}`'s balanced-accuracy 95% CI "
+                        f"({t_lo:.0%}–{t_hi:.0%}) does **not** overlap the runner-up's "
+                        f"({s_lo:.0%}–{s_hi:.0%}), so its lead is statistically distinguishable "
+                        f"at this sample size."
+                    )
     else:
         lines.append(
             "Detection rate = fraction of injection attacks correctly flagged. "
