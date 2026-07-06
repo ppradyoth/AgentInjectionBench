@@ -2,15 +2,17 @@
 
 Ranked by **balanced accuracy** = mean of detection rate (recall on attacks) and specificity (recall on the benign control split). A flag-everything defense scores 50% here, not 100% — the benign controls make the leaderboard calibration-resistant.
 
-Detection = attacks caught; FPR = benign wrongly flagged (lower is better); Precision = of everything flagged, the share that was a real attack; Sev-Wtd Det = detection rate weighted by severity (critical counts most).
+Detection = attacks caught; FPR = benign wrongly flagged (lower is better); Precision = of everything flagged, the share that was a real attack; Sev-Wtd Det = detection rate weighted by severity (critical counts most). **95% CI** is the Wilson-score interval on balanced accuracy — with only 132 attacks and 36 benign controls, adjacent ranks whose intervals overlap are not statistically distinguishable.
 
-| Rank | Model / Defense | Balanced Acc | Detection | Sev-Wtd Det | FPR | Precision | F1 | Attacks | Benign |
-|---:|:---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | agentic_directive_scanner | 63.8% | 47.0% | 44.5% | 19.4% | 89.9% | 0.617 | 132 | 36 |
-| 2 | tool_definition_scanner | 56.9% | 33.3% | 29.8% | 19.4% | 86.3% | 0.481 | 132 | 36 |
-| 3 | keyword_baseline | 54.3% | 28.0% | 25.4% | 19.4% | 84.1% | 0.420 | 132 | 36 |
-| 4 | flag_all_baseline | 50.0% | 100.0% | 100.0% | 100.0% | 78.6% | 0.880 | 132 | 36 |
-| 5 | no_op_baseline | 50.0% | 0.0% | 0.0% | 0.0% | — | — | 132 | 36 |
+| Rank | Model / Defense | Balanced Acc | 95% CI | Detection | Sev-Wtd Det | FPR | Precision | F1 | Attacks | Benign |
+|---:|:---|---:|:---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | agentic_directive_scanner | 63.8% | 52%–73% | 47.0% | 44.5% | 19.4% | 89.9% | 0.617 | 132 | 36 |
+| 2 | tool_definition_scanner | 56.9% | 45%–66% | 33.3% | 29.8% | 19.4% | 86.3% | 0.481 | 132 | 36 |
+| 3 | keyword_baseline | 54.3% | 43%–63% | 28.0% | 25.4% | 19.4% | 84.1% | 0.420 | 132 | 36 |
+| 4 | flag_all_baseline | 50.0% | 49%–55% | 100.0% | 100.0% | 100.0% | 78.6% | 0.880 | 132 | 36 |
+| 5 | no_op_baseline | 50.0% | 45%–51% | 0.0% | 0.0% | 0.0% | — | — | 132 | 36 |
+
+> ⚠️ **Ranking caveat:** the top two entries (`agentic_directive_scanner`, `tool_definition_scanner`) have **overlapping** balanced-accuracy 95% CIs (52%–73% vs. 45%–66%), so the #1 lead is **within sampling noise** — not yet statistically established. A larger dataset (the v0.2 goal) would tighten these intervals.
 
 ## Per-category detection rate
 
