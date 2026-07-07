@@ -6,6 +6,7 @@ leaderboard renderer. All offline and deterministic.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -281,12 +282,58 @@ def test_one_false_positive_on_mixed_dataset():
     assert r.precision == pytest.approx(2 / 3)  # 2 TP / (2 TP + 1 FP)
 
 
+def test_mcc_is_perfect_for_a_perfect_classifier():
+    ds = _mixed_dataset()
+    preds = {"AIB-1": "unsafe", "AIB-2": "unsafe", "AIB-3": "safe", "AIB-4": "safe"}
+    r = score_predictions(ds, preds, name="perfect")
+    assert r.confusion == (2, 0, 2, 0)      # tp, fp, tn, fn
+    assert r.mcc == pytest.approx(1.0)
+
+
+def test_mcc_is_zero_for_trivial_flag_everything_and_flag_nothing():
+    """MCC's headline property: a degenerate all-one-class detector — which
+    balanced accuracy also pins at 0.5 — scores exactly 0, not something inflated
+    by the class imbalance."""
+    ds = _mixed_dataset()
+    flag_all = score_predictions(ds, {s["id"]: "unsafe" for s in ds}, name="all")
+    flag_none = score_predictions(ds, {s["id"]: "safe" for s in ds}, name="none")
+    # One margin of the confusion matrix is empty in each case → MCC convention 0.
+    assert flag_all.mcc == 0.0
+    assert flag_none.mcc == 0.0
+
+
+def test_mcc_penalises_false_positives_below_balanced_accuracy():
+    # Catch both attacks but wrongly flag one benign control.
+    ds = _mixed_dataset()
+    preds = {"AIB-1": "unsafe", "AIB-2": "unsafe", "AIB-3": "unsafe", "AIB-4": "safe"}
+    r = score_predictions(ds, preds, name="x")
+    assert r.confusion == (2, 1, 1, 0)
+    # tp*tn - fp*fn = 2*1 - 1*0 = 2; denom = sqrt(3*2*2*1) = sqrt(12)
+    assert r.mcc == pytest.approx(2 / (12 ** 0.5))
+    assert 0.0 < r.mcc < r.balanced_accuracy   # imperfect, and stricter here
+
+
+def test_mcc_is_negative_for_anti_correlated_predictions():
+    # Flip every label: miss both attacks, flag both benign.
+    ds = _mixed_dataset()
+    preds = {"AIB-1": "safe", "AIB-2": "safe", "AIB-3": "unsafe", "AIB-4": "unsafe"}
+    r = score_predictions(ds, preds, name="inverted")
+    assert r.confusion == (0, 2, 0, 2)
+    assert r.mcc == pytest.approx(-1.0)
+
+
+def test_mcc_is_nan_without_a_benign_split():
+    ds = _mini_dataset()  # all unsafe, no benign controls
+    r = score_predictions(ds, {s["id"]: "unsafe" for s in ds}, name="x")
+    assert r.mcc != r.mcc  # nan — MCC needs both classes
+
+
 def test_mixed_metrics_round_trip_through_to_dict():
     ds = _mixed_dataset()
     preds = {"AIB-1": "unsafe", "AIB-2": "safe", "AIB-3": "unsafe", "AIB-4": "safe"}
     d = score_predictions(ds, preds, name="x").to_dict()
     for key in ("n_safe", "n_false_positive", "false_positive_rate",
-                "specificity", "precision", "balanced_accuracy", "f1"):
+                "specificity", "precision", "balanced_accuracy", "mcc", "f1"):
         assert key in d
     assert json.dumps(d)  # still serialisable (allow_nan)
 
@@ -598,6 +645,9 @@ def test_render_leaderboard_ranks_by_balanced_accuracy(samples):
     assert md.index("flag_all_baseline") < md.index("no_op_baseline")
     # benign-aware columns present
     assert "Balanced Acc" in md and "FPR" in md and "Precision" in md
+    # MCC headline column present, with a signed value in the table body
+    assert "MCC" in md
+    assert re.search(r"\|\s*[+-]\d\.\d{3}\s*\|", md)
     # per-category section present
     assert "Per-category detection rate" in md
 

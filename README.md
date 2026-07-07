@@ -165,23 +165,28 @@ python -m evaluation.leaderboard --baselines -o LEADERBOARD.md
 Since the dataset now ships a **benign control split**, the harness also reports
 *false-positive rate* (benign wrongly flagged), *precision*, and **balanced accuracy**
 (mean of detection rate and specificity) — the calibration-resistant headline a
-flag-everything defense can no longer game. It also reports *severity-weighted
-detection* — detection rate weighted by severity (low=1, medium=2, high=4,
-critical=8) — so a detector that catches only easy, low-severity attacks scores
-low even at a decent flat rate. All are reported per attack category and per
-severity.
+flag-everything defense can no longer game. It also reports the **Matthews
+correlation coefficient (MCC)** — a single correlation in `[−1, +1]` folding all
+four confusion cells — which, under the 132-attack / 36-benign class imbalance, is
+the most honest one-number summary: a trivial flag-everything or flag-nothing
+detector scores exactly `0` (where its F1 can still look respectable), and only a
+detector that is right on *both* classes scores high. It also reports
+*severity-weighted detection* — detection rate weighted by severity (low=1,
+medium=2, high=4, critical=8) — so a detector that catches only easy, low-severity
+attacks scores low even at a decent flat rate. All are reported per attack category
+and per severity.
 
 ### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
 
 Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 
-| Defense | Balanced Acc | Detection | FPR | Precision |
-|:---|---:|---:|---:|---:|
-| `agentic_directive_scanner` (directive + de-obfuscation) | **63.8%** | 47.0% | 19.4% | 89.9% |
-| `tool_definition_scanner` (definition-aware guardrail) | 56.9% | 33.3% | 19.4% | 86.3% |
-| `keyword_baseline` (regex guardrail) | 54.3% | 28.0% | 19.4% | 84.1% |
-| `flag_all` (flag everything) | 50.0% | 100.0% | 100.0% | 78.6% |
-| `no_op` (allow everything) | 50.0% | 0.0% | 0.0% | — |
+| Defense | Balanced Acc | MCC | Detection | FPR | Precision |
+|:---|---:|---:|---:|---:|---:|
+| `agentic_directive_scanner` (directive + de-obfuscation) | **63.8%** | **+0.230** | 47.0% | 19.4% | 89.9% |
+| `tool_definition_scanner` (definition-aware guardrail) | 56.9% | +0.124 | 33.3% | 19.4% | 86.3% |
+| `keyword_baseline` (regex guardrail) | 54.3% | +0.080 | 28.0% | 19.4% | 84.1% |
+| `flag_all` (flag everything) | 50.0% | +0.000 | 100.0% | 100.0% | 78.6% |
+| `no_op` (allow everything) | 50.0% | +0.000 | 0.0% | 0.0% | — |
 
 > **A generic keyword guardrail catches only ~28% of these attacks** — agentic
 > injections hide inside tool output, RAG documents, and multi-turn state, where

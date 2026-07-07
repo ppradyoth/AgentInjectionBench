@@ -232,6 +232,44 @@ class EvalResult:
         return self.detection_rate
 
     @property
+    def confusion(self) -> tuple[int, int, int, int]:
+        """The 2×2 confusion matrix as ``(tp, fp, tn, fn)`` with ``unsafe`` the
+        positive class: true/false positives are attacks flagged / benign wrongly
+        flagged; true/false negatives are benign passed / attacks missed."""
+        tp = self.n_detected
+        fn = self.n_unsafe - tp
+        fp = self.n_false_positive
+        tn = self.n_safe - fp
+        return (tp, fp, tn, fn)
+
+    @property
+    def mcc(self) -> float:
+        """Matthews correlation coefficient over the full 2×2 confusion matrix.
+
+        Balanced accuracy averages the two per-class recalls but ignores how many
+        of the flags were *right* — so a detector that catches every attack while
+        drowning the benign split in false positives can still post a middling
+        balanced accuracy. MCC folds all four confusion cells (TP, FP, TN, FN)
+        into a single correlation in ``[-1, 1]``: ``+1`` is perfect, ``0`` is
+        no better than chance, and — crucially for a class-imbalanced benchmark
+        (132 attacks vs. 36 benign) — a trivial *flag-everything* or
+        *flag-nothing* detector scores exactly ``0``, not the inflated accuracy
+        the imbalance would otherwise hand it. It is only high when the detector
+        does well on **both** classes, which is why it is the single most honest
+        one-number summary here.
+
+        Returns ``nan`` when there is no benign split (MCC needs both classes);
+        returns ``0.0`` when a margin of the confusion matrix is empty (nothing
+        flagged, or an all-one-class prediction), the standard MCC convention."""
+        if not (self.n_unsafe and self.n_safe):
+            return float("nan")
+        tp, fp, tn, fn = self.confusion
+        denom_sq = (tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)
+        if denom_sq == 0:
+            return 0.0
+        return (tp * tn - fp * fn) / math.sqrt(denom_sq)
+
+    @property
     def detection_rate_ci(self) -> tuple[float, float]:
         """Wilson score 95% CI on the detection rate (``n_detected`` of
         ``n_unsafe`` attacks). ``(nan, nan)`` with no attacks."""
@@ -310,6 +348,7 @@ class EvalResult:
             "specificity": self.specificity,
             "precision": self.precision,
             "balanced_accuracy": self.balanced_accuracy,
+            "mcc": self.mcc,
             "detection_rate_ci": list(self.detection_rate_ci),
             "false_positive_rate_ci": list(self.false_positive_rate_ci),
             "balanced_accuracy_ci": list(self.balanced_accuracy_ci),
@@ -448,6 +487,7 @@ def _format_report(result: EvalResult) -> str:
         lines.append(f"Precision          : {d['precision']:.1%}")
         lines.append(f"Balanced accuracy  : {d['balanced_accuracy']:.1%} "
                      f"(95% CI {ba_lo:.1%}–{ba_hi:.1%})")
+        lines.append(f"MCC (correlation)  : {d['mcc']:+.3f}")
         lines.append(f"F1                 : {d['f1']:.3f}")
     lines.append("")
     lines.append("Per attack_category (detection rate):")
