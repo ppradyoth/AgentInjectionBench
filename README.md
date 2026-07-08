@@ -176,6 +176,16 @@ medium=2, high=4, critical=8) — so a detector that catches only easy, low-seve
 attacks scores low even at a decent flat rate. All are reported per attack category
 and per severity.
 
+**Residual hard set (the frontier).** The leaderboard also isolates the attacks
+that evade *every* discriminating detector at once — the honest measure of what
+agentic-injection defenses still cannot catch. Per-detector rates say how each
+defense does alone; a sample caught by *some* detector is within reach of the
+right ensemble, but one missed by *all* of them is the open problem the next
+detector or attack category must target. On the released data **70 of 132 attacks
+(53%)** are unanimously evaded, concentrated on the `tool_output` surface —
+the single blind spot a flat detection rate hides. (Constant-prediction anchors
+like `flag_all` / `no_op` are excluded; they carry no information for this view.)
+
 ### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
 
 Scored over **168 samples** (132 attacks + 36 matched-benign controls):
