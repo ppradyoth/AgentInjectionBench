@@ -15,6 +15,7 @@ from evaluation.detectors import DETECTORS
 from evaluation.leaderboard import render_leaderboard
 from evaluation.score import (
     SEVERITY_WEIGHTS,
+    ensemble_coverage,
     load_dataset,
     load_predictions,
     normalize_label,
@@ -849,3 +850,101 @@ def test_frontier_on_real_baselines_appears_in_leaderboard(samples):
     md = render_leaderboard(results, frontier=f)
     assert "Residual hard set" in md
     assert "discriminating detectors" in md
+
+
+# --- ensemble coverage (union ceiling + greedy set cover) ----------------
+
+
+def test_ensemble_union_catches_what_any_detector_catches():
+    ds = _frontier_dataset()
+    preds = {
+        # A catches AIB-1; B catches AIB-2. AIB-3 evades both. No false positives.
+        "det_a": {"AIB-1": "unsafe", "AIB-2": "safe", "AIB-3": "safe", "AIB-4": "safe"},
+        "det_b": {"AIB-1": "safe", "AIB-2": "unsafe", "AIB-3": "safe", "AIB-4": "safe"},
+    }
+    e = ensemble_coverage(ds, preds)
+    assert e["n_attacks"] == 3 and e["n_benign"] == 1
+    # Union catches AIB-1 and AIB-2 (2 of 3); AIB-3 is the residual.
+    assert e["union"]["n_attacks_caught"] == 2
+    assert e["union"]["detection_rate"] == pytest.approx(2 / 3)
+    assert e["union"]["false_positive_rate"] == pytest.approx(0.0)
+
+
+def test_ensemble_union_accumulates_false_positives():
+    ds = _frontier_dataset()
+    preds = {
+        # Each detector trips the single benign control (AIB-4) → union FPR = 100%.
+        "det_a": {"AIB-1": "unsafe", "AIB-2": "safe", "AIB-3": "safe", "AIB-4": "unsafe"},
+        "det_b": {"AIB-1": "safe", "AIB-2": "unsafe", "AIB-3": "safe", "AIB-4": "safe"},
+    }
+    e = ensemble_coverage(ds, preds)
+    assert e["union"]["false_positive_rate"] == pytest.approx(1.0)
+    assert e["union"]["n_benign_flagged"] == 1
+
+
+def test_ensemble_greedy_picks_biggest_marginal_cover_first():
+    ds = _frontier_dataset()
+    preds = {
+        # big: catches AIB-1 + AIB-2 (2 attacks). small: catches only AIB-3 (1).
+        "big": {"AIB-1": "unsafe", "AIB-2": "unsafe", "AIB-3": "safe", "AIB-4": "safe"},
+        "small": {"AIB-1": "safe", "AIB-2": "safe", "AIB-3": "unsafe", "AIB-4": "safe"},
+    }
+    e = ensemble_coverage(ds, preds)
+    order = [step["detector"] for step in e["greedy"]]
+    assert order == ["big", "small"]           # largest marginal cover chosen first
+    assert e["greedy"][0]["marginal_attacks_caught"] == 2
+    assert e["greedy"][0]["cumulative_detection_rate"] == pytest.approx(2 / 3)
+    assert e["greedy"][-1]["cumulative_detection_rate"] == pytest.approx(1.0)
+
+
+def test_ensemble_greedy_breaks_ties_by_lower_added_fpr():
+    ds = _frontier_dataset()
+    preds = {
+        # Both catch exactly 1 new attack, but 'clean' adds no FP while 'noisy'
+        # trips the benign control — the tie must break toward 'clean' first.
+        "noisy": {"AIB-1": "unsafe", "AIB-2": "safe", "AIB-3": "safe", "AIB-4": "unsafe"},
+        "clean": {"AIB-1": "safe", "AIB-2": "unsafe", "AIB-3": "safe", "AIB-4": "safe"},
+    }
+    e = ensemble_coverage(ds, preds)
+    assert e["greedy"][0]["detector"] == "clean"
+    assert e["greedy"][0]["added_false_positives"] == 0
+
+
+def test_ensemble_greedy_stops_before_useless_detectors():
+    ds = _frontier_dataset()
+    preds = {
+        "covers_all": {"AIB-1": "unsafe", "AIB-2": "unsafe", "AIB-3": "unsafe", "AIB-4": "safe"},
+        "redundant": {"AIB-1": "unsafe", "AIB-2": "safe", "AIB-3": "safe", "AIB-4": "safe"},
+    }
+    e = ensemble_coverage(ds, preds)
+    # One detector already reaches the ceiling; the redundant one adds no attack.
+    assert [s["detector"] for s in e["greedy"]] == ["covers_all"]
+    assert e["greedy"][-1]["cumulative_detection_rate"] == pytest.approx(1.0)
+
+
+def test_ensemble_excludes_constant_anchors():
+    ds = _frontier_dataset()
+    preds = {
+        "real": {"AIB-1": "unsafe", "AIB-2": "unsafe", "AIB-3": "safe", "AIB-4": "safe"},
+        "flag_all": {s["id"]: "unsafe" for s in ds},
+        "no_op": {s["id"]: "safe" for s in ds},
+    }
+    e = ensemble_coverage(ds, preds)
+    assert e["detectors"] == ["real"]
+    assert set(e["excluded_detectors"]) == {"flag_all", "no_op"}
+
+
+def test_ensemble_on_real_baselines_appears_in_leaderboard(samples):
+    from evaluation.detectors import DETECTORS as DETS
+    preds_by = {
+        name: {s["id"]: normalize_label(DETS[name](s)) for s in samples} for name in DETS
+    }
+    e = ensemble_coverage(samples, preds_by)
+    assert len(e["detectors"]) == 3          # anchors excluded, 3 real scanners remain
+    # The union must dominate every *informative* detector's detection rate (the
+    # excluded flag-everything anchor trivially hits 1.0 and is not a real defense).
+    best_single = max(run_detector(samples, n).detection_rate for n in e["detectors"])
+    assert e["union"]["detection_rate"] >= best_single
+    md = render_leaderboard([run_detector(samples, n) for n in DETS], ensemble=e)
+    assert "Ensemble coverage" in md
+    assert "Greedy minimal set" in md

@@ -186,6 +186,19 @@ detector or attack category must target. On the released data **70 of 132 attack
 the single blind spot a flat detection rate hides. (Constant-prediction anchors
 like `flag_all` / `no_op` are excluded; they carry no information for this view.)
 
+**Ensemble coverage (the ceiling).** The complement of the residual hard set:
+what the best *combination* of baselines catches, and at what cost. Because an
+OR-ensemble inherits every member's false positives, the honest ceiling is a
+**detection / FPR pair**, not a detection number alone — the union catches
+**47.0%** of attacks at **19.4%** FPR. A **greedy set cover** then reports the
+minimal detector set that reaches it, adding at each step the detector that
+newly catches the most so-far-missed attacks (ties broken by lower added FPR).
+On the released data that surfaces a non-obvious fact the per-detector table
+hides: the three scanners are nested supersets, so **just 1 of 3** reaches the
+full union ceiling and the other two add no attack the first misses — the
+baselines are redundant, not complementary. (`from evaluation.score import
+ensemble_coverage`.)
+
 ### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
 
 Scored over **168 samples** (132 attacks + 36 matched-benign controls):

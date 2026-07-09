@@ -17,6 +17,7 @@ from pathlib import Path
 from evaluation.score import (
     SEVERITY_WEIGHTS,
     EvalResult,
+    ensemble_coverage,
     load_dataset,
     load_predictions,
     normalize_label,
@@ -65,7 +66,11 @@ def _rank_key(r: EvalResult) -> tuple:
     )
 
 
-def render_leaderboard(results: list[EvalResult], frontier: dict | None = None) -> str:
+def render_leaderboard(
+    results: list[EvalResult],
+    frontier: dict | None = None,
+    ensemble: dict | None = None,
+) -> str:
     has_benign = any(r.n_safe for r in results)
     ranked = sorted(results, key=_rank_key)
 
@@ -232,6 +237,56 @@ def render_leaderboard(results: list[EvalResult], frontier: dict | None = None) 
             lines.append(f"| {r.name} | " + " | ".join(cells) + " |")
         lines.append("")
 
+    # Ensemble coverage — the OR-ensemble ceiling and the greedy minimal set that
+    # reaches it. The complement of the residual hard set: what the best
+    # *combination* of baselines catches, and at what false-positive cost. Only
+    # meaningful with ≥2 informative detectors.
+    if ensemble and len(ensemble.get("detectors", [])) >= 2:
+        u = ensemble["union"]
+        lines.append("## Ensemble coverage — the best any combination can do")
+        lines.append("")
+        lines.append(
+            f"Flagging a sample when **any** of the {len(ensemble['detectors'])} discriminating "
+            f"detectors flags it (an OR-ensemble) is the detection ceiling of the current "
+            f"baselines — but it accumulates every member's false positives, so the honest "
+            f"ceiling is a **detection / FPR pair**. The union catches "
+            f"**{u['detection_rate']:.1%}** of attacks at **{u['false_positive_rate']:.1%}** FPR "
+            f"(balanced accuracy {u['balanced_accuracy']:.1%}, MCC {u['mcc']:+.3f})."
+        )
+        excluded = ensemble.get("excluded_detectors") or []
+        if excluded:
+            lines.append("")
+            lines.append(
+                "> Constant-prediction anchors ("
+                + ", ".join(f"`{n}`" for n in excluded)
+                + ") are excluded: a flag-everything anchor would hit 100% detection at 100% "
+                "FPR and a flag-nothing anchor adds nothing, so neither informs a "
+                "best-real-combination analysis."
+            )
+        lines.append("")
+        lines.append(
+            "**Greedy minimal set** — add the detector that newly catches the most "
+            "so-far-missed attacks (ties broken by smaller added FPR):"
+        )
+        lines.append("")
+        lines.append("| Step | + Detector | New attacks | Cumulative detection | Cumulative FPR |")
+        lines.append("|---:|:---|---:|---:|---:|")
+        for i, step in enumerate(ensemble["greedy"], 1):
+            lines.append(
+                f"| {i} | `{step['detector']}` | +{step['marginal_attacks_caught']} | "
+                f"{step['cumulative_detection_rate']:.1%} | "
+                f"{step['cumulative_false_positive_rate']:.1%} |"
+            )
+        lines.append("")
+        n_used = len(ensemble["greedy"])
+        n_inf = len(ensemble["detectors"])
+        if n_used < n_inf:
+            lines.append(
+                f"_Just **{n_used} of {n_inf}** detectors reach the full union detection "
+                f"ceiling — the rest add no attack the others miss._"
+            )
+            lines.append("")
+
     # Residual hard set — the attacks that evade *every* detector at once. Only
     # meaningful with ≥2 detectors: with one, "missed by all" is just its own
     # detection rate, already in the table above.
@@ -326,7 +381,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("Nothing to score: pass --baselines and/or --predictions")
 
     frontier = residual_hard_set(samples, predictions_by_detector)
-    md = render_leaderboard(results, frontier=frontier)
+    ensemble = ensemble_coverage(samples, predictions_by_detector)
+    md = render_leaderboard(results, frontier=frontier, ensemble=ensemble)
     if args.output:
         args.output.write_text(md)
         print(f"Wrote {args.output} ({len(results)} entries)")

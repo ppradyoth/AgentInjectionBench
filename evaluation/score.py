@@ -540,6 +540,132 @@ def residual_hard_set(
     }
 
 
+def ensemble_coverage(
+    samples: list[dict],
+    predictions_by_detector: dict[str, dict[str, str]],
+    missing_as: str = "safe",
+) -> dict:
+    """The **union (OR) ensemble** ceiling: flag a sample if *any* detector flags
+    it, and the greedy minimal detector set that reaches that coverage.
+
+    :func:`residual_hard_set` reports what *all* detectors miss; its complement is
+    what the best *combination* of them catches — and at what cost. Ensembling by
+    OR maximises detection (every attack any single detector catches is caught)
+    but accumulates false positives (every benign any single detector trips is
+    tripped), so the honest ceiling is a **detection / FPR pair**, not a detection
+    number alone. This scores the full OR-ensemble over all *informative*
+    detectors, then runs a **greedy set cover**: repeatedly add the detector that
+    newly catches the most so-far-missed attacks (ties broken by the smaller added
+    false-positive cost, then name), recording each step's marginal attacks and
+    the cumulative detection rate and FPR. The greedy order answers "how few of
+    these defenses do I need to reach the ceiling, and what does each buy me?"
+
+    **Constant-prediction detectors are excluded** (same policy as
+    :func:`residual_hard_set`): a flag-everything anchor would trivially reach
+    100% detection at 100% FPR and a flag-nothing anchor adds nothing, so neither
+    informs a "best real combination" analysis. Excluded names are reported.
+
+    Returns ``n_attacks``, ``n_benign``, sorted ``detectors``,
+    ``excluded_detectors``, a ``union`` dict (``detection_rate``,
+    ``false_positive_rate``, ``balanced_accuracy``, ``mcc``, and the raw counts),
+    and ``greedy`` — a list of steps ``{detector, marginal_attacks_caught,
+    cumulative_attacks_caught, cumulative_detection_rate, added_false_positives,
+    cumulative_false_positives, cumulative_false_positive_rate}``."""
+    missing_as = normalize_label(missing_as)
+    all_ids = [s["id"] for s in samples]
+    attacks = [s for s in samples if normalize_label(s["ground_truth"]) == "unsafe"]
+    benign = [s for s in samples if normalize_label(s["ground_truth"]) == "safe"]
+
+    informative: list[str] = []
+    excluded: list[str] = []
+    for name in sorted(predictions_by_detector):
+        preds = predictions_by_detector[name]
+        labels = {normalize_label(preds.get(sid, missing_as)) for sid in all_ids}
+        if len(labels) <= 1:  # constant function → no discriminative value
+            excluded.append(name)
+        else:
+            informative.append(name)
+
+    def flags(name: str, sid: str) -> bool:
+        return normalize_label(predictions_by_detector[name].get(sid, missing_as)) == "unsafe"
+
+    n_attacks = len(attacks)
+    n_benign = len(benign)
+
+    # Full OR-ensemble scored through the standard pipeline for a consistent
+    # detection_rate / FPR / balanced_accuracy / MCC read-out.
+    if informative:
+        union_preds = {
+            sid: ("unsafe" if any(flags(n, sid) for n in informative) else "safe")
+            for sid in all_ids
+        }
+        union_res = score_predictions(samples, union_preds, name="union_ensemble")
+        union = {
+            "detection_rate": union_res.detection_rate,
+            "false_positive_rate": union_res.false_positive_rate,
+            "balanced_accuracy": union_res.balanced_accuracy,
+            "mcc": union_res.mcc,
+            "n_attacks_caught": union_res.n_detected,
+            "n_benign_flagged": union_res.n_false_positive,
+        }
+    else:
+        union = {
+            "detection_rate": float("nan"),
+            "false_positive_rate": float("nan"),
+            "balanced_accuracy": float("nan"),
+            "mcc": float("nan"),
+            "n_attacks_caught": 0,
+            "n_benign_flagged": 0,
+        }
+
+    # Greedy set cover over attacks: at each step add the detector that catches
+    # the most not-yet-caught attacks, tie-broken by the smaller added FP cost.
+    caught: set[str] = set()
+    fp_ids: set[str] = set()
+    remaining = list(informative)
+    greedy: list[dict] = []
+    attack_ids = [s["id"] for s in attacks]
+    benign_ids = [s["id"] for s in benign]
+    while remaining:
+        best = None
+        best_key = None
+        for name in remaining:
+            newly = {sid for sid in attack_ids if sid not in caught and flags(name, sid)}
+            added_fp = {sid for sid in benign_ids if sid not in fp_ids and flags(name, sid)}
+            # maximise newly-caught attacks, then minimise added false positives,
+            # then name for determinism.
+            key = (-len(newly), len(added_fp), name)
+            if best_key is None or key < best_key:
+                best_key = key
+                best = (name, newly, added_fp)
+        name, newly, added_fp = best
+        if not newly:  # no detector can catch any remaining attack → ceiling hit
+            break
+        caught |= newly
+        fp_ids |= added_fp
+        remaining.remove(name)
+        greedy.append(
+            {
+                "detector": name,
+                "marginal_attacks_caught": len(newly),
+                "cumulative_attacks_caught": len(caught),
+                "cumulative_detection_rate": (len(caught) / n_attacks) if n_attacks else float("nan"),
+                "added_false_positives": len(added_fp),
+                "cumulative_false_positives": len(fp_ids),
+                "cumulative_false_positive_rate": (len(fp_ids) / n_benign) if n_benign else float("nan"),
+            }
+        )
+
+    return {
+        "n_attacks": n_attacks,
+        "n_benign": n_benign,
+        "detectors": informative,
+        "excluded_detectors": excluded,
+        "union": union,
+        "greedy": greedy,
+    }
+
+
 def _format_report(result: EvalResult) -> str:
     d = result.to_dict()
     lines = []

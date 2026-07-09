@@ -50,6 +50,20 @@ The untrusted channel the payload arrives on. A low cell means the detector rare
 | flag_all_baseline | 100% | 100% | 100% | 100% | 100% |
 | no_op_baseline | 0% | 0% | 0% | 0% | 0% |
 
+## Ensemble coverage — the best any combination can do
+
+Flagging a sample when **any** of the 3 discriminating detectors flags it (an OR-ensemble) is the detection ceiling of the current baselines — but it accumulates every member's false positives, so the honest ceiling is a **detection / FPR pair**. The union catches **47.0%** of attacks at **19.4%** FPR (balanced accuracy 63.8%, MCC +0.230).
+
+> Constant-prediction anchors (`flag_all_baseline`, `no_op_baseline`) are excluded: a flag-everything anchor would hit 100% detection at 100% FPR and a flag-nothing anchor adds nothing, so neither informs a best-real-combination analysis.
+
+**Greedy minimal set** — add the detector that newly catches the most so-far-missed attacks (ties broken by smaller added FPR):
+
+| Step | + Detector | New attacks | Cumulative detection | Cumulative FPR |
+|---:|:---|---:|---:|---:|
+| 1 | `agentic_directive_scanner` | +62 | 47.0% | 19.4% |
+
+_Just **1 of 3** detectors reach the full union detection ceiling — the rest add no attack the others miss._
+
 ## Residual hard set — attacks no baseline catches
 
 Of 132 attacks, **70 (53.0%)** are missed by **all 3 discriminating detectors simultaneously** — the frontier this benchmark exists to push. An attack caught by *some* detector is within reach of the right ensemble; one evaded by *every* baseline is the open problem the next detector or attack category must target.
