@@ -18,7 +18,9 @@ from evaluation.score import (
     ensemble_coverage,
     load_dataset,
     load_predictions,
+    mcnemar_test,
     normalize_label,
+    pairwise_mcnemar,
     residual_hard_set,
     run_detector,
     score_predictions,
@@ -948,3 +950,123 @@ def test_ensemble_on_real_baselines_appears_in_leaderboard(samples):
     md = render_leaderboard([run_detector(samples, n) for n in DETS], ensemble=e)
     assert "Ensemble coverage" in md
     assert "Greedy minimal set" in md
+
+
+# --- McNemar paired significance test ------------------------------------
+
+
+def _attack_ds(n: int) -> list[dict]:
+    """n ground-truth-unsafe samples with unique ids."""
+    return [{"id": f"AIB-{i}", "ground_truth": "unsafe"} for i in range(n)]
+
+
+def test_mcnemar_identical_detectors_have_no_discordant_pairs():
+    ds = _attack_ds(10)
+    preds = {s["id"]: "unsafe" for s in ds}
+    r = mcnemar_test(ds, preds, dict(preds), name_a="A", name_b="B")
+    assert r["n_discordant"] == 0
+    assert r["method"] == "no_discordant"
+    assert r["p_value"] == 1.0
+    assert r["significant"] is False
+    assert r["better"] == "tie"
+    assert r["both_correct"] == 10
+
+
+def test_mcnemar_one_sided_discordance_is_significant_exact():
+    # A right on every sample, B wrong on every sample → 8 discordant pairs, all
+    # favouring A. Exact two-sided binomial p = 2 * C(8,0) / 2^8 = 2/256.
+    ds = _attack_ds(8)
+    a = {s["id"]: "unsafe" for s in ds}   # all correct
+    b = {s["id"]: "safe" for s in ds}     # all wrong
+    r = mcnemar_test(ds, a, b, name_a="A", name_b="B")
+    assert r["a_correct_b_wrong"] == 8
+    assert r["a_wrong_b_correct"] == 0
+    assert r["n_discordant"] == 8
+    assert r["method"] == "exact_binomial"
+    assert r["p_value"] == pytest.approx(2 / 256)
+    assert r["significant"] is True
+    assert r["better"] == "A"
+
+
+def test_mcnemar_balanced_discordance_is_not_significant():
+    # 3 samples only A gets right, 3 only B gets right, symmetric → coin flip.
+    ds = _attack_ds(6)
+    a, b = {}, {}
+    for i, s in enumerate(ds):
+        sid = s["id"]
+        if i < 3:            # A right, B wrong
+            a[sid], b[sid] = "unsafe", "safe"
+        else:                 # A wrong, B right
+            a[sid], b[sid] = "safe", "unsafe"
+    r = mcnemar_test(ds, a, b, name_a="A", name_b="B")
+    assert r["a_correct_b_wrong"] == 3
+    assert r["a_wrong_b_correct"] == 3
+    assert r["method"] == "exact_binomial"
+    assert r["p_value"] == pytest.approx(1.0)
+    assert r["significant"] is False
+    assert r["better"] == "tie"
+
+
+def test_mcnemar_large_discordance_uses_continuity_chi_square():
+    # 30 discordant pairs (> 25) all favouring B → chi-square path, significant.
+    ds = _attack_ds(30)
+    a = {s["id"]: "safe" for s in ds}     # all wrong
+    b = {s["id"]: "unsafe" for s in ds}   # all right
+    r = mcnemar_test(ds, a, b, name_a="A", name_b="B")
+    assert r["n_discordant"] == 30
+    assert r["method"] == "chi2_continuity"
+    # (|0-30|-1)^2 / 30 = 29^2/30
+    assert r["statistic"] == pytest.approx(29 ** 2 / 30)
+    assert r["significant"] is True
+    assert r["better"] == "B"
+
+
+def test_mcnemar_method_cutover_at_25_discordant():
+    # Exactly 25 discordant → exact; 26 → chi-square.
+    ds25 = _attack_ds(25)
+    r25 = mcnemar_test(ds25, {s["id"]: "unsafe" for s in ds25}, {s["id"]: "safe" for s in ds25})
+    assert r25["method"] == "exact_binomial"
+    ds26 = _attack_ds(26)
+    r26 = mcnemar_test(ds26, {s["id"]: "unsafe" for s in ds26}, {s["id"]: "safe" for s in ds26})
+    assert r26["method"] == "chi2_continuity"
+
+
+def test_mcnemar_p_value_is_a_probability():
+    ds = _attack_ds(12)
+    a = {s["id"]: ("unsafe" if i % 3 else "safe") for i, s in enumerate(ds)}
+    b = {s["id"]: ("unsafe" if i % 2 else "safe") for i, s in enumerate(ds)}
+    r = mcnemar_test(ds, a, b)
+    assert 0.0 <= r["p_value"] <= 1.0
+    # Contingency cells partition the sample set exactly.
+    assert (
+        r["both_correct"] + r["a_correct_b_wrong"] + r["a_wrong_b_correct"] + r["both_wrong"]
+        == len(ds)
+    )
+
+
+def test_pairwise_mcnemar_covers_every_pair(samples):
+    from evaluation.detectors import DETECTORS as DETS
+    preds_by = {
+        name: {s["id"]: normalize_label(DETS[name](s)) for s in samples} for name in DETS
+    }
+    p = pairwise_mcnemar(samples, preds_by)
+    n = len(DETS)
+    assert p["detectors"] == sorted(DETS)
+    assert len(p["pairs"]) == n * (n - 1) // 2
+    seen = {frozenset((pr["detector_a"], pr["detector_b"])) for pr in p["pairs"]}
+    assert len(seen) == len(p["pairs"])  # each unordered pair once
+    for pr in p["pairs"]:
+        assert pr["detector_a"] < pr["detector_b"]  # deterministic ordering
+        assert 0.0 <= pr["p_value"] <= 1.0
+
+
+def test_pairwise_mcnemar_appears_in_leaderboard(samples):
+    from evaluation.detectors import DETECTORS as DETS
+    results = [run_detector(samples, n) for n in DETS]
+    preds_by = {
+        name: {s["id"]: normalize_label(DETS[name](s)) for s in samples} for name in DETS
+    }
+    paired = pairwise_mcnemar(samples, preds_by)
+    md = render_leaderboard(results, paired=paired)
+    assert "Paired significance" in md
+    assert "McNemar" in md
