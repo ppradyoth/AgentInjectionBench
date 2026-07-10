@@ -21,6 +21,7 @@ from evaluation.score import (
     load_dataset,
     load_predictions,
     normalize_label,
+    pairwise_mcnemar,
     residual_hard_set,
     score_predictions,
 )
@@ -53,6 +54,16 @@ def _short(cat: str) -> str:
     return "".join(w[0] for w in cat.split("_")).upper()
 
 
+def _find_pair(paired: dict | None, name_a: str, name_b: str) -> dict | None:
+    """Return the McNemar pair result for two detectors regardless of order."""
+    if not paired:
+        return None
+    for p in paired.get("pairs", []):
+        if {p["detector_a"], p["detector_b"]} == {name_a, name_b}:
+            return p
+    return None
+
+
 def _rank_key(r: EvalResult) -> tuple:
     """Ascending sort key giving: balanced accuracy desc (the calibration-
     resistant headline), then detection rate desc, then name asc — a
@@ -70,6 +81,7 @@ def render_leaderboard(
     results: list[EvalResult],
     frontier: dict | None = None,
     ensemble: dict | None = None,
+    paired: dict | None = None,
 ) -> str:
     has_benign = any(r.n_safe for r in results)
     ranked = sorted(results, key=_rank_key)
@@ -136,6 +148,34 @@ def render_leaderboard(
                         f"({t_lo:.0%}–{t_hi:.0%}) does **not** overlap the runner-up's "
                         f"({s_lo:.0%}–{s_hi:.0%}), so its lead is statistically distinguishable "
                         f"at this sample size."
+                    )
+            # Paired McNemar test on the identical sample set — the correct,
+            # more-powerful complement to the unpaired CI-overlap check above.
+            top_pair = _find_pair(paired, top.name, second.name) if paired else None
+            if top_pair is not None:
+                lines.append("")
+                if top_pair["n_discordant"] == 0:
+                    lines.append(
+                        f"> 🔬 **Paired check (McNemar):** `{top.name}` and `{second.name}` "
+                        f"agree on every sample (no discordant pairs), so they are "
+                        f"indistinguishable on this dataset."
+                    )
+                elif top_pair["significant"]:
+                    lines.append(
+                        f"> 🔬 **Paired check (McNemar, {top_pair['method'].replace('_', ' ')}):** "
+                        f"on the identical sample set the two differ **significantly** "
+                        f"(p = {top_pair['p_value']:.3f}; {top_pair['a_correct_b_wrong']} samples "
+                        f"only `{top_pair['detector_a']}` gets right vs. "
+                        f"{top_pair['a_wrong_b_correct']} only `{top_pair['detector_b']}` does), "
+                        f"favouring `{top_pair['better']}`."
+                    )
+                else:
+                    lines.append(
+                        f"> 🔬 **Paired check (McNemar, {top_pair['method'].replace('_', ' ')}):** "
+                        f"even paired on the identical sample set, the #1 lead is **not** "
+                        f"significant (p = {top_pair['p_value']:.3f}; discordant split "
+                        f"{top_pair['a_correct_b_wrong']} vs. {top_pair['a_wrong_b_correct']}) — "
+                        f"the ranking is within sampling noise."
                     )
     else:
         lines.append(
@@ -336,6 +376,56 @@ def render_leaderboard(
             )
             lines.append("")
 
+    # Pairwise paired-significance matrix — the correct test for "is detector X
+    # really better than Y", conditioning on the samples where exactly one is
+    # right. Complements the per-detector table (unpaired) above.
+    if paired and len(paired.get("pairs", [])) >= 1:
+        lines.append("## Paired significance — McNemar's test")
+        lines.append("")
+        lines.append(
+            "The table above ranks detectors by balanced accuracy with **unpaired** "
+            "Wilson intervals. But every detector is scored on the **same samples**, so "
+            "the sharper question — *is X really better than Y?* — is a **paired** one. "
+            "McNemar's test conditions on the **discordant** samples (where exactly one "
+            "detector is correct) and asks whether the split is more lopsided than a coin "
+            "flip. Concordant samples (both right / both wrong) carry no signal and are "
+            "ignored. p-values use the **exact binomial** test when discordant pairs are "
+            "few (≤ 25) and the **continuity-corrected chi-square** otherwise; "
+            "**bold** p-values are significant at α = 0.05."
+        )
+        lines.append("")
+        lines.append(
+            "> ⚠️ McNemar compares **overall accuracy**, so under this benchmark's "
+            "132-attack / 36-benign imbalance a constant *flag-everything* anchor can win a "
+            "pair on raw accuracy alone — which is exactly why the headline ranking uses "
+            "**balanced accuracy** and **MCC** (both pin that anchor at chance). Read this "
+            "table as the paired significance of differences **between the real detectors**, "
+            "a complement to — not a replacement for — the calibration-resistant ranking above."
+        )
+        lines.append("")
+        lines.append(
+            "| Detector A | Detector B | A-only right | B-only right | p-value | Method | Verdict |"
+        )
+        lines.append("|:---|:---|---:|---:|---:|:---|:---|")
+        for p in paired["pairs"]:
+            pv = f"**{p['p_value']:.3f}**" if p["significant"] else f"{p['p_value']:.3f}"
+            if p["n_discordant"] == 0:
+                verdict = "identical"
+            elif p["significant"]:
+                verdict = f"`{p['better']}` better"
+            else:
+                verdict = "within noise"
+            method = {
+                "exact_binomial": "exact",
+                "chi2_continuity": "χ² (cc)",
+                "no_discordant": "—",
+            }.get(p["method"], p["method"])
+            lines.append(
+                f"| `{p['detector_a']}` | `{p['detector_b']}` | {p['a_correct_b_wrong']} | "
+                f"{p['a_wrong_b_correct']} | {pv} | {method} | {verdict} |"
+            )
+        lines.append("")
+
     lines.append(
         "_Generated by `python -m evaluation.leaderboard`. "
         "Baselines are dependency-free reference defenses, not strong guardrails._"
@@ -382,7 +472,8 @@ def main(argv: list[str] | None = None) -> int:
 
     frontier = residual_hard_set(samples, predictions_by_detector)
     ensemble = ensemble_coverage(samples, predictions_by_detector)
-    md = render_leaderboard(results, frontier=frontier, ensemble=ensemble)
+    paired = pairwise_mcnemar(samples, predictions_by_detector) if len(results) >= 2 else None
+    md = render_leaderboard(results, frontier=frontier, ensemble=ensemble, paired=paired)
     if args.output:
         args.output.write_text(md)
         print(f"Wrote {args.output} ({len(results)} entries)")
