@@ -18,6 +18,7 @@ from evaluation.score import (
     ensemble_coverage,
     load_dataset,
     load_predictions,
+    mcc_ci,
     mcnemar_test,
     normalize_label,
     pairwise_mcnemar,
@@ -758,9 +759,54 @@ def test_specificity_ci_reflects_fpr_ci():
 def test_to_dict_surfaces_cis(samples):
     r = run_detector(samples, "keyword_baseline")
     d = r.to_dict()
-    for key in ("detection_rate_ci", "false_positive_rate_ci", "balanced_accuracy_ci"):
+    for key in ("detection_rate_ci", "false_positive_rate_ci", "balanced_accuracy_ci", "mcc_ci"):
         assert key in d
         assert isinstance(d[key], list) and len(d[key]) == 2
+
+
+# --- MCC bootstrap confidence interval -----------------------------------
+
+
+def test_mcc_ci_brackets_point_estimate():
+    # A non-trivial confusion matrix: 8 tp, 2 fp, 8 tn, 2 fn → MCC = 0.6.
+    lo, hi = mcc_ci(8, 2, 8, 2)
+    point = 0.6
+    assert lo <= point <= hi
+    assert -1.0 <= lo <= hi <= 1.0
+
+
+def test_mcc_ci_is_deterministic_with_seed():
+    # The committed LEADERBOARD.md must be reproducible run-to-run.
+    assert mcc_ci(8, 2, 8, 2) == mcc_ci(8, 2, 8, 2)
+
+
+def test_mcc_ci_narrows_with_more_data():
+    """The same confusion proportions on more samples give a tighter interval."""
+    small_lo, small_hi = mcc_ci(8, 2, 8, 2)
+    big_lo, big_hi = mcc_ci(80, 20, 80, 20)
+    assert (big_hi - big_lo) < (small_hi - small_lo)
+
+
+def test_mcc_ci_nan_without_a_benign_split():
+    # No benign controls (tn = fp = 0) → MCC undefined, so is its interval.
+    lo, hi = mcc_ci(10, 0, 0, 5)
+    assert lo != lo and hi != hi  # both nan
+
+
+def test_result_mcc_ci_property_matches_free_function():
+    ds = _mixed_dataset()
+    preds = {"AIB-1": "unsafe", "AIB-2": "unsafe", "AIB-3": "unsafe", "AIB-4": "safe"}
+    r = score_predictions(ds, preds, name="fp")
+    # The property is just the seeded bootstrap over this result's confusion cells.
+    assert r.mcc_ci == mcc_ci(*r.confusion)
+    lo, hi = r.mcc_ci
+    assert -1.0 <= lo <= hi <= 1.0
+
+
+def test_leaderboard_shows_mcc_ci(samples):
+    results = [run_detector(samples, n) for n in DETECTORS]
+    md = render_leaderboard(results)
+    assert "MCC 95% CI" in md
 
 
 def test_leaderboard_shows_ci_and_significance_note(samples):
