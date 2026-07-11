@@ -105,22 +105,27 @@ def render_leaderboard(
                      "Detection = attacks caught; FPR = benign wrongly flagged (lower is better); "
                      "Precision = of everything flagged, the share that was a real attack; "
                      "Sev-Wtd Det = detection rate weighted by severity (critical counts most). "
-                     "**95% CI** is the Wilson-score interval on balanced accuracy — with only "
+                     "**95% CI** is the Wilson-score interval on balanced accuracy, and "
+                     "**MCC 95% CI** its bootstrap counterpart — MCC is non-linear in the four "
+                     "confusion cells, so it takes a resampling interval rather than a closed-form "
+                     "one — with only "
                      f"{ranked[0].n_unsafe} attacks and {ranked[0].n_safe} benign controls, "
                      "adjacent ranks whose intervals overlap are not statistically distinguishable.")
         lines.append("")
-        lines.append("| Rank | Model / Defense | Balanced Acc | 95% CI | MCC | Detection | Sev-Wtd Det | FPR | Precision | F1 | Attacks | Benign |")
-        lines.append("|---:|:---|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+        lines.append("| Rank | Model / Defense | Balanced Acc | 95% CI | MCC | MCC 95% CI | Detection | Sev-Wtd Det | FPR | Precision | F1 | Attacks | Benign |")
+        lines.append("|---:|:---|---:|:---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|")
         for i, r in enumerate(ranked, 1):
             fpr = f"{r.false_positive_rate:.1%}" if r.n_safe else "—"
             prec = f"{r.precision:.1%}" if (r.n_detected + r.n_false_positive) else "—"
             f1 = f"{r.f1:.3f}" if r.f1 == r.f1 else "—"
             swd = f"{r.severity_weighted_detection:.1%}" if r.n_unsafe else "—"
             mcc = f"{r.mcc:+.3f}" if r.mcc == r.mcc else "—"
+            mcc_lo, mcc_hi = r.mcc_ci
+            mcc_ci_txt = f"{mcc_lo:+.2f}–{mcc_hi:+.2f}" if mcc_lo == mcc_lo else "—"
             ba_lo, ba_hi = r.balanced_accuracy_ci
             ci = f"{ba_lo:.0%}–{ba_hi:.0%}" if ba_lo == ba_lo else "—"
             lines.append(
-                f"| {i} | {r.name} | {r.balanced_accuracy:.1%} | {ci} | {mcc} | {r.detection_rate:.1%} | "
+                f"| {i} | {r.name} | {r.balanced_accuracy:.1%} | {ci} | {mcc} | {mcc_ci_txt} | {r.detection_rate:.1%} | "
                 f"{swd} | {fpr} | {prec} | {f1} | {r.n_unsafe} | {r.n_safe} |"
             )
         # Is the #1 vs #2 gap real, or within sampling noise? Compare their

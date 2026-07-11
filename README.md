@@ -170,7 +170,11 @@ correlation coefficient (MCC)** — a single correlation in `[−1, +1]` folding
 four confusion cells — which, under the 132-attack / 36-benign class imbalance, is
 the most honest one-number summary: a trivial flag-everything or flag-nothing
 detector scores exactly `0` (where its F1 can still look respectable), and only a
-detector that is right on *both* classes scores high. It also reports
+detector that is right on *both* classes scores high. MCC carries a **95%
+confidence interval** too — a seeded nonparametric bootstrap, since MCC is
+non-linear in the four confusion cells and so has no closed-form Wilson interval
+like the proportions do — so you can see whether a detector's correlation with
+ground truth is actually distinguishable from chance. It also reports
 *severity-weighted detection* — detection rate weighted by severity (low=1,
 medium=2, high=4, critical=8) — so a detector that catches only easy, low-severity
 attacks scores low even at a decent flat rate. All are reported per attack category
@@ -203,13 +207,20 @@ ensemble_coverage`.)
 
 Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 
-| Defense | Balanced Acc | MCC | Detection | FPR | Precision |
-|:---|---:|---:|---:|---:|---:|
-| `agentic_directive_scanner` (directive + de-obfuscation) | **63.8%** | **+0.230** | 47.0% | 19.4% | 89.9% |
-| `tool_definition_scanner` (definition-aware guardrail) | 56.9% | +0.124 | 33.3% | 19.4% | 86.3% |
-| `keyword_baseline` (regex guardrail) | 54.3% | +0.080 | 28.0% | 19.4% | 84.1% |
-| `flag_all` (flag everything) | 50.0% | +0.000 | 100.0% | 100.0% | 78.6% |
-| `no_op` (allow everything) | 50.0% | +0.000 | 0.0% | 0.0% | — |
+| Defense | Balanced Acc | MCC | MCC 95% CI | Detection | FPR | Precision |
+|:---|---:|---:|:---:|---:|---:|---:|
+| `agentic_directive_scanner` (directive + de-obfuscation) | **63.8%** | **+0.230** | +0.09–+0.35 | 47.0% | 19.4% | 89.9% |
+| `tool_definition_scanner` (definition-aware guardrail) | 56.9% | +0.124 | −0.02–+0.25 | 33.3% | 19.4% | 86.3% |
+| `keyword_baseline` (regex guardrail) | 54.3% | +0.080 | −0.06–+0.22 | 28.0% | 19.4% | 84.1% |
+| `flag_all` (flag everything) | 50.0% | +0.000 | +0.00–+0.00 | 100.0% | 100.0% | 78.6% |
+| `no_op` (allow everything) | 50.0% | +0.000 | +0.00–+0.00 | 0.0% | 0.0% | — |
+
+> The **MCC 95% CI** (a seeded nonparametric bootstrap — MCC is non-linear in the
+> four confusion cells, so it has no closed-form Wilson interval) makes an honest
+> point the point estimates hide: only `agentic_directive_scanner`'s interval
+> clears **0**, so it is the only baseline whose correlation with ground truth is
+> statistically distinguishable from chance at this sample size; the two weaker
+> scanners' intervals still include 0.
 
 > **A generic keyword guardrail catches only ~28% of these attacks** — agentic
 > injections hide inside tool output, RAG documents, and multi-turn state, where
