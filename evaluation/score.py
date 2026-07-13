@@ -347,7 +347,7 @@ class EvalResult:
         balanced accuracy. MCC folds all four confusion cells (TP, FP, TN, FN)
         into a single correlation in ``[-1, 1]``: ``+1`` is perfect, ``0`` is
         no better than chance, and — crucially for a class-imbalanced benchmark
-        (132 attacks vs. 36 benign) — a trivial *flag-everything* or
+        (attacks outnumber the benign controls) — a trivial *flag-everything* or
         *flag-nothing* detector scores exactly ``0``, not the inflated accuracy
         the imbalance would otherwise hand it. It is only high when the detector
         does well on **both** classes, which is why it is the single most honest
