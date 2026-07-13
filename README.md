@@ -167,7 +167,7 @@ Since the dataset now ships a **benign control split**, the harness also reports
 (mean of detection rate and specificity) — the calibration-resistant headline a
 flag-everything defense can no longer game. It also reports the **Matthews
 correlation coefficient (MCC)** — a single correlation in `[−1, +1]` folding all
-four confusion cells — which, under the 132-attack / 36-benign class imbalance, is
+four confusion cells — which, under the 142-attack / 40-benign class imbalance, is
 the most honest one-number summary: a trivial flag-everything or flag-nothing
 detector scores exactly `0` (where its F1 can still look respectable), and only a
 detector that is right on *both* classes scores high. MCC carries a **95%
@@ -185,8 +185,8 @@ that evade *every* discriminating detector at once — the honest measure of wha
 agentic-injection defenses still cannot catch. Per-detector rates say how each
 defense does alone; a sample caught by *some* detector is within reach of the
 right ensemble, but one missed by *all* of them is the open problem the next
-detector or attack category must target. On the released data **70 of 132 attacks
-(53%)** are unanimously evaded, concentrated on the `tool_output` surface —
+detector or attack category must target. On the released data **50 of 142 attacks
+(35%)** are unanimously evaded, concentrated on the `tool_output` surface —
 the single blind spot a flat detection rate hides. (Constant-prediction anchors
 like `flag_all` / `no_op` are excluded; they carry no information for this view.)
 
@@ -194,35 +194,37 @@ like `flag_all` / `no_op` are excluded; they carry no information for this view.
 what the best *combination* of baselines catches, and at what cost. Because an
 OR-ensemble inherits every member's false positives, the honest ceiling is a
 **detection / FPR pair**, not a detection number alone — the union catches
-**47.0%** of attacks at **19.4%** FPR. A **greedy set cover** then reports the
+**64.8%** of attacks at **17.5%** FPR. A **greedy set cover** then reports the
 minimal detector set that reaches it, adding at each step the detector that
 newly catches the most so-far-missed attacks (ties broken by lower added FPR).
 On the released data that surfaces a non-obvious fact the per-detector table
-hides: the three scanners are nested supersets, so **just 1 of 3** reaches the
-full union ceiling and the other two add no attack the first misses — the
+hides: the four scanners are nested supersets, so **just 1 of 4** reaches the
+full union ceiling and the other three add no attack the first misses — the
 baselines are redundant, not complementary. (`from evaluation.score import
 ensemble_coverage`.)
 
 ### Baseline results — [`LEADERBOARD.md`](LEADERBOARD.md)
 
-Scored over **168 samples** (132 attacks + 36 matched-benign controls):
+Scored over **182 samples** (142 attacks + 40 matched-benign controls):
 
 | Defense | Balanced Acc | MCC | MCC 95% CI | Detection | FPR | Precision |
 |:---|---:|---:|:---:|---:|---:|---:|
-| `agentic_directive_scanner` (directive + de-obfuscation) | **63.8%** | **+0.230** | +0.09–+0.35 | 47.0% | 19.4% | 89.9% |
-| `tool_definition_scanner` (definition-aware guardrail) | 56.9% | +0.124 | −0.02–+0.25 | 33.3% | 19.4% | 86.3% |
-| `keyword_baseline` (regex guardrail) | 54.3% | +0.080 | −0.06–+0.22 | 28.0% | 19.4% | 84.1% |
-| `flag_all` (flag everything) | 50.0% | +0.000 | +0.00–+0.00 | 100.0% | 100.0% | 78.6% |
+| `control_channel_scanner` (control-channel spoofing + directive) | **73.6%** | **+0.393** | +0.26–+0.51 | 64.8% | 17.5% | 92.9% |
+| `agentic_directive_scanner` (directive + de-obfuscation) | 63.4% | +0.229 | +0.10–+0.34 | 44.4% | 17.5% | 90.0% |
+| `tool_definition_scanner` (definition-aware guardrail) | 57.1% | +0.130 | +0.00–+0.26 | 31.7% | 17.5% | 86.5% |
+| `keyword_baseline` (regex guardrail) | 54.6% | +0.089 | −0.04–+0.22 | 26.8% | 17.5% | 84.4% |
+| `flag_all` (flag everything) | 50.0% | +0.000 | +0.00–+0.00 | 100.0% | 100.0% | 78.0% |
 | `no_op` (allow everything) | 50.0% | +0.000 | +0.00–+0.00 | 0.0% | 0.0% | — |
 
 > The **MCC 95% CI** (a seeded nonparametric bootstrap — MCC is non-linear in the
 > four confusion cells, so it has no closed-form Wilson interval) makes an honest
-> point the point estimates hide: only `agentic_directive_scanner`'s interval
-> clears **0**, so it is the only baseline whose correlation with ground truth is
-> statistically distinguishable from chance at this sample size; the two weaker
-> scanners' intervals still include 0.
+> point the point estimates hide: `control_channel_scanner` and
+> `agentic_directive_scanner` are the two baselines whose intervals clear **0**,
+> so they are the only ones whose correlation with ground truth is statistically
+> distinguishable from chance at this sample size; the two weaker scanners'
+> intervals still touch 0.
 
-> **A generic keyword guardrail catches only ~28% of these attacks** — agentic
+> **A generic keyword guardrail catches only ~27% of these attacks** — agentic
 > injections hide inside tool output, RAG documents, and multi-turn state, where
 > naive string filtering fails. And the benign controls expose the other half of
 > the problem: `flag_all` has perfect recall but a **100% false-positive rate**, so
@@ -246,13 +248,14 @@ Scored over **168 samples** (132 attacks + 36 matched-benign controls):
 > which the keyword scan sees, so it caught **~10% / ~5%** of those two classes.
 > `agentic_directive_scanner` adds a pass for that structure and **de-obfuscates**
 > untrusted text (strip zero-width chars, NFKC-normalise confusables/enclosed
-> glyphs) before re-scanning — lifting overall detection **33% → 47%** at the
-> **same false-positive rate**, and taking the leaderboard lead at **63.8%**
-> balanced accuracy.
+> glyphs) before re-scanning — lifting overall detection **32% → 44%** at the
+> **same false-positive rate**. The newer `control_channel_scanner` extends it
+> with a pass for tool/MCP output that impersonates the platform's own control
+> channel, taking the current leaderboard lead at **73.6%** balanced accuracy.
 
 ## 🚀 Current Status & Roadmap
 
-**The dataset ships 168 hand-crafted samples — 132 agentic injection attacks plus 36 matched-benign controls.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline. The benign controls (`generation/benign_controls.py`, `make` with `python -m generation.benign_controls --append`) make the leaderboard calibration-resistant; expanding them in step with the attacks keeps it that way.
+**The dataset ships 182 hand-crafted samples — 142 agentic injection attacks plus 40 matched-benign controls.** The goal is to grow this to **2500+ samples** via synthetic expansion using the built-in generation pipeline. The benign controls (`generation/benign_controls.py`, `make` with `python -m generation.benign_controls --append`) make the leaderboard calibration-resistant; expanding them in step with the attacks keeps it that way.
 
 ### How to help expand the dataset
 

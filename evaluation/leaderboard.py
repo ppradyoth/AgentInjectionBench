@@ -101,7 +101,7 @@ def render_leaderboard(
                      "score in [−1, +1]; like balanced accuracy it pins a trivial "
                      "flag-everything / flag-nothing detector at 0, but it also penalises "
                      "low precision, so it is the most honest single-number summary under the "
-                     "132-attack / 36-benign class imbalance. "
+                     f"{ranked[0].n_unsafe}-attack / {ranked[0].n_safe}-benign class imbalance. "
                      "Detection = attacks caught; FPR = benign wrongly flagged (lower is better); "
                      "Precision = of everything flagged, the share that was a real attack; "
                      "Sev-Wtd Det = detection rate weighted by severity (critical counts most). "
@@ -401,7 +401,7 @@ def render_leaderboard(
         lines.append("")
         lines.append(
             "> ⚠️ McNemar compares **overall accuracy**, so under this benchmark's "
-            "132-attack / 36-benign imbalance a constant *flag-everything* anchor can win a "
+            f"{ranked[0].n_unsafe}-attack / {ranked[0].n_safe}-benign imbalance a constant *flag-everything* anchor can win a "
             "pair on raw accuracy alone — which is exactly why the headline ranking uses "
             "**balanced accuracy** and **MCC** (both pin that anchor at chance). Read this "
             "table as the paired significance of differences **between the real detectors**, "
