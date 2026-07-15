@@ -13,11 +13,14 @@ from pathlib import Path
 import pytest
 import yaml
 
+import copy
+
 from generation.validate_schema import (
     CONVERSATION_ROLES,
     SCHEMA,
     load_taxonomy,
     validate_file,
+    validate_sample,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -119,6 +122,30 @@ def test_conversations_are_well_formed(samples):
             assert turn.get("role") in CONVERSATION_ROLES, (
                 f"{s['id']}: turn {i} invalid role {turn.get('role')!r}"
             )
+            # Detectors only scan string content, so every turn must carry it.
+            assert isinstance(turn.get("content"), str), (
+                f"{s['id']}: turn {i} content must be a string (detectors can't "
+                f"scan {type(turn.get('content')).__name__})"
+            )
+
+
+def test_validator_rejects_non_string_or_missing_turn_content(samples, taxonomy):
+    # Structured (list/dict) or absent content is an unscanned surface — a sample
+    # no detector can read. The validator must reject it, not pass it silently.
+    base = copy.deepcopy(samples[0])
+
+    structured = copy.deepcopy(base)
+    structured["conversation"][0]["content"] = [{"type": "text", "text": "hi"}]
+    errs = validate_sample(structured, taxonomy, 1)
+    assert any("content" in e and "str" in e for e in errs), errs
+
+    missing = copy.deepcopy(base)
+    del missing["conversation"][0]["content"]
+    errs = validate_sample(missing, taxonomy, 1)
+    assert any("missing 'content'" in e for e in errs), errs
+
+    # The unmodified sample still validates clean (guards against over-tightening).
+    assert validate_sample(copy.deepcopy(base), taxonomy, 1) == []
 
 
 def test_tool_definitions_have_names(samples):
