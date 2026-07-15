@@ -117,6 +117,21 @@ def validate_sample(sample: dict, taxonomy: dict, line_num: int) -> list[str]:
         elif turn["role"] not in CONVERSATION_ROLES:
             errors.append(f"{prefix}: conversation[{i}] invalid role '{turn['role']}'")
 
+        # Every turn must carry string content. The detectors scan untrusted
+        # text only from string ``content`` (``_untrusted_text`` /
+        # ``_tool_definition_text``), so a missing or non-string (list/dict)
+        # content field would be an *unscanned* surface — a sample no detector
+        # can read, silently lowering measured attack difficulty. Enforce the
+        # invariant here so such a contribution fails validation loudly instead.
+        if "content" not in turn:
+            errors.append(f"{prefix}: conversation[{i}] missing 'content'")
+        elif not isinstance(turn["content"], str):
+            errors.append(
+                f"{prefix}: conversation[{i}] 'content' expected str, got "
+                f"{type(turn['content']).__name__} — detectors only scan string "
+                "content, so structured content would be an unscanned blind spot"
+            )
+
     for tool_def in sample.get("tools_available", []):
         if not isinstance(tool_def, dict):
             errors.append(f"{prefix}: tools_available entry must be a dict")
