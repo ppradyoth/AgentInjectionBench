@@ -155,6 +155,33 @@ def test_tool_definitions_have_names(samples):
             assert tool.get("name"), f"{s['id']}: tool def missing name"
 
 
+def test_validator_rejects_non_string_tool_definition_text(samples, taxonomy):
+    # Tool definitions are a detector-scanned surface too (`_tool_definition_text`
+    # reads the top-level description and every per-parameter description/title).
+    # A non-string description/title is an unscanned blind spot — reject it,
+    # mirroring the turn-content invariant.
+    base = copy.deepcopy(samples[0])
+
+    bad_desc = copy.deepcopy(base)
+    bad_desc["tools_available"][0]["description"] = {"text": "structured"}
+    errs = validate_sample(bad_desc, taxonomy, 1)
+    assert any("description" in e and "str" in e for e in errs), errs
+
+    bad_param = copy.deepcopy(base)
+    bad_param["tools_available"][0]["parameters"] = {
+        "properties": {"x": {"description": ["not", "a", "string"]}}
+    }
+    errs = validate_sample(bad_param, taxonomy, 1)
+    assert any("schema" in e and "str" in e for e in errs), errs
+
+    # A clean tool schema with string parameter descriptions still validates.
+    ok = copy.deepcopy(base)
+    ok["tools_available"][0]["parameters"] = {
+        "properties": {"x": {"type": "string", "description": "A normal parameter."}}
+    }
+    assert validate_sample(ok, taxonomy, 1) == []
+
+
 # ----------------------------- taxonomy + templates -----------------------------
 
 def test_taxonomy_has_all_referenced_sections(taxonomy):
