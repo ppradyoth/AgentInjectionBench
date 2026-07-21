@@ -133,13 +133,43 @@ DEFINITION_PATTERNS = [
 _DEF_COMPILED = [re.compile(p, re.IGNORECASE) for p in DEFINITION_PATTERNS]
 
 
+# Keys carrying human-readable text inside a JSON-Schema-style tool parameter
+# definition. A tool's ``parameters`` / ``inputSchema`` (per-parameter
+# ``description`` / ``title`` strings) is the canonical MCP tool-poisoning
+# surface — a reviewer reads the rendered parameter help, so an attacker hides
+# ``<IMPORTANT>``-style directives there, not only in the top-level description.
+_SCHEMA_TEXT_KEYS = ("description", "title")
+
+
+def _collect_schema_text(node: object, out: list[str]) -> None:
+    """Recursively gather ``description`` / ``title`` strings from a tool's
+    parameter schema (dicts/lists at any depth), so the definition patterns see
+    the per-parameter poisoning surface, not just the top-level description."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key in _SCHEMA_TEXT_KEYS and isinstance(value, str):
+                out.append(value)
+            else:
+                _collect_schema_text(value, out)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_schema_text(item, out)
+
+
 def _tool_definition_text(sample: Sample) -> str:
-    """Concatenate every advertised tool name + description."""
-    parts = []
+    """Concatenate every advertised tool name + description, **including** the
+    per-parameter ``description`` / ``title`` text inside each tool's
+    ``parameters`` / ``inputSchema`` — a JSON-Schema-style poisoning surface a
+    top-level-description-only scan silently misses."""
+    parts: list[str] = []
     for tool in sample.get("tools_available", []) or []:
         if isinstance(tool, dict):
             parts.append(str(tool.get("name", "")))
             parts.append(str(tool.get("description", "")))
+            for schema_key in ("parameters", "inputSchema"):
+                schema = tool.get(schema_key)
+                if schema is not None:
+                    _collect_schema_text(schema, parts)
     return "\n".join(parts)
 
 
@@ -172,8 +202,10 @@ def tool_definition_scanner(sample: Sample) -> str:
     guardrail flags (so it never regresses on any category) and additionally
     catches definition-level poisoning — hidden ``<IMPORTANT>`` directives,
     precedence/authority claims, invisible/homoglyph obfuscation, and hidden
-    exfiltration preconditions — that live in the tool *description*, a surface
-    output scanning never reads. On the released dataset this lifts
+    exfiltration preconditions — that live in the tool *description* **or in a
+    per-parameter ``description`` / ``title``** inside the tool's
+    ``parameters`` / ``inputSchema``, surfaces output scanning never reads. On
+    the released dataset this lifts
     tool_shadowing detection from ~25% to ~83% at no change in false-positive
     rate (benign controls carry clean tool definitions).
     """

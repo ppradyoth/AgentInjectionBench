@@ -135,9 +135,51 @@ def validate_sample(sample: dict, taxonomy: dict, line_num: int) -> list[str]:
     for tool_def in sample.get("tools_available", []):
         if not isinstance(tool_def, dict):
             errors.append(f"{prefix}: tools_available entry must be a dict")
-        elif "name" not in tool_def:
+            continue
+        if "name" not in tool_def:
             errors.append(f"{prefix}: tool definition missing 'name'")
+        # The tool *definition* is an untrusted, detector-scanned surface too
+        # (``_tool_definition_text`` reads the top-level ``description`` and every
+        # per-parameter ``description`` / ``title`` in ``parameters`` /
+        # ``inputSchema``). Mirror the conversation-content invariant: a
+        # non-string description/title is an unscanned blind spot, so fail loudly.
+        if "description" in tool_def and not isinstance(tool_def["description"], str):
+            errors.append(
+                f"{prefix}: tool definition 'description' expected str, got "
+                f"{type(tool_def['description']).__name__} — detectors scan tool "
+                "definitions as string text, so a structured description is an "
+                "unscanned blind spot"
+            )
+        for schema_key in ("parameters", "inputSchema"):
+            schema = tool_def.get(schema_key)
+            if schema is not None:
+                errors.extend(_check_schema_text_is_string(schema, prefix, schema_key))
 
+    return errors
+
+
+def _check_schema_text_is_string(
+    node: object, prefix: str, path: str
+) -> list[str]:
+    """Every ``description`` / ``title`` inside a tool parameter schema must be a
+    string — it is scanned as untrusted tool-definition text, so a non-string
+    value would be a surface no detector can read (same invariant as turn
+    ``content``). Walk the schema recursively and report any offenders."""
+    errors: list[str] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            child = f"{path}.{key}"
+            if key in ("description", "title") and not isinstance(value, str):
+                errors.append(
+                    f"{prefix}: tool schema '{child}' expected str, got "
+                    f"{type(value).__name__} — a non-string parameter "
+                    "description/title is an unscanned blind spot"
+                )
+            else:
+                errors.extend(_check_schema_text_is_string(value, prefix, child))
+    elif isinstance(node, list):
+        for idx, item in enumerate(node):
+            errors.extend(_check_schema_text_is_string(item, prefix, f"{path}[{idx}]"))
     return errors
 
 
