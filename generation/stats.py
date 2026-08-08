@@ -47,7 +47,7 @@ def print_cross_tab(table: dict[str, Counter], key_a: str, key_b: str):
 
 def print_full_stats(samples: list[dict]):
     print(f"{'=' * 60}")
-    print(f"AgentInjectionBench Dataset Statistics")
+    print("AgentInjectionBench Dataset Statistics")
     print(f"{'=' * 60}")
     print(f"Total samples: {len(samples)}")
     print()
