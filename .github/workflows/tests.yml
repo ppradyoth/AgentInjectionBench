@@ -1,0 +1,41 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, "auto/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml jsonschema
+
+      - name: Run dataset-integrity tests
+        run: python -m pytest -q
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      # Lint the maintained core. `generation/` was previously never linted, which
+      # is how an f-string-without-placeholders (F541) slipped in unnoticed; it is
+      # now in scope so the same class of regression fails CI.
+      - name: Ruff lint
+        run: ruff check evaluation generation tests
