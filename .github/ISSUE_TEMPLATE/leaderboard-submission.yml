@@ -1,0 +1,48 @@
+name: Leaderboard submission
+description: Submit reproducible results for AgentInjectionBench
+title: "Leaderboard submission: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit the prediction JSONL and score JSON as issue attachments or links.
+        Read SUBMITTING.md first.
+  - type: input
+    id: system
+    attributes:
+      label: System or guardrail
+      placeholder: "My Agent v1.2"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model and provider
+      placeholder: "Model name, provider, and version"
+    validations:
+      required: true
+  - type: input
+    id: fingerprint
+    attributes:
+      label: Dataset SHA-256
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Reproduction command
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Artifacts
+      description: Link to predictions.jsonl and result.json.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Mention tool-definition access, latency, cost, or limitations.

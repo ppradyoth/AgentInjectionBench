@@ -89,6 +89,10 @@ def render_leaderboard(
     lines: list[str] = []
     lines.append("# AgentInjectionBench Leaderboard")
     lines.append("")
+    fingerprints = {r.dataset_fingerprint for r in results if r.dataset_fingerprint}
+    if len(fingerprints) == 1:
+        lines.append(f"Dataset SHA-256: `{next(iter(fingerprints))}`")
+        lines.append("")
     if has_benign:
         lines.append(
             "Ranked by **balanced accuracy** = mean of detection rate (recall on "

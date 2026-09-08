@@ -17,13 +17,12 @@ classifiers = [
 ]
 
 dependencies = [
-    "anthropic>=0.40.0",
     "pyyaml>=6.0",
     "jsonschema>=4.20.0",
-    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
+anthropic = ["anthropic>=0.40.0"]
 openai = ["openai>=1.50.0"]
 space = [
     "gradio>=5.0.0",
@@ -34,7 +33,7 @@ dev = [
     "ruff>=0.5.0",
     "pytest>=8.0.0",
 ]
-all = ["agent-injection-bench[openai,space,dev]"]
+all = ["agent-injection-bench[anthropic,openai,space,dev]"]
 
 [project.scripts]
 aib-generate = "generation.generate:main"
@@ -51,6 +50,7 @@ build-backend = "hatchling.build"
 # The code lives in top-level packages rather than a single src/ package
 # matching the distribution name, so list them explicitly for hatchling.
 packages = ["generation", "evaluation"]
+force-include = {"data" = "data"}
 
 [tool.ruff]
 line-length = 100

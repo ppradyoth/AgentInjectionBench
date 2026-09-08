@@ -1,7 +1,5 @@
 """Anthropic Claude provider with prompt caching support."""
 
-import anthropic
-
 from generation.providers import BaseLLMProvider, register_provider
 
 
@@ -9,6 +7,13 @@ from generation.providers import BaseLLMProvider, register_provider
 class AnthropicProvider(BaseLLMProvider):
 
     def __init__(self, model: str = "claude-sonnet-4-6", **kwargs):
+        try:
+            import anthropic
+        except ImportError as exc:
+            raise ImportError(
+                "Anthropic provider requires the anthropic package. "
+                "Install with: pip install agent-injection-bench[anthropic]"
+            ) from exc
         self.model = model
         self._client = anthropic.Anthropic()
         self._max_tokens = kwargs.get("max_tokens", 4096)

@@ -16,6 +16,7 @@ from evaluation.leaderboard import render_leaderboard
 from evaluation.score import (
     SEVERITY_WEIGHTS,
     ensemble_coverage,
+    dataset_fingerprint,
     load_dataset,
     load_predictions,
     mcc_ci,
@@ -27,6 +28,7 @@ from evaluation.score import (
     score_predictions,
     wilson_ci,
 )
+from evaluation import score as score_module
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_FILE = REPO_ROOT / "data" / "agent_injection_bench.jsonl"
@@ -60,6 +62,35 @@ def test_normalize_label(raw, expected):
 def test_normalize_label_rejects_garbage():
     with pytest.raises(ValueError):
         normalize_label("maybe")
+
+
+def test_dataset_fingerprint_is_stable_and_content_sensitive():
+    ds = _mini_dataset()
+    assert dataset_fingerprint(ds) == dataset_fingerprint(json.loads(json.dumps(ds)))
+    changed = json.loads(json.dumps(ds))
+    changed[0]["severity"] = "critical"
+    assert dataset_fingerprint(ds) != dataset_fingerprint(changed)
+
+
+def test_duplicate_prediction_ids_are_rejected(tmp_path):
+    path = tmp_path / "predictions.jsonl"
+    path.write_text(
+        '{"id":"AIB-1","prediction":"safe"}\n'
+        '{"id":"AIB-1","prediction":"unsafe"}\n'
+    )
+    with pytest.raises(ValueError, match="Duplicate prediction"):
+        load_predictions(path)
+
+
+def test_unknown_prediction_ids_are_rejected():
+    with pytest.raises(ValueError, match="not present in the dataset"):
+        score_predictions(_mini_dataset(), {"AIB-999": "safe"}, name="bad")
+
+
+def test_score_cli_thresholds_gate_results(capsys):
+    assert score_module.main(["--detector", "keyword_baseline", "--max-asr", "0.8"]) == 0
+    assert score_module.main(["--detector", "keyword_baseline", "--max-asr", "0.7"]) == 1
+    assert "Benchmark gate failed" in capsys.readouterr().err
 
 
 # --- scoring math --------------------------------------------------------
@@ -145,6 +176,7 @@ def test_leaderboard_renders_injection_surface_matrix(samples):
     md = render_leaderboard([r])
     assert "Per-injection-surface detection rate" in md
     assert "tool output" in md
+    assert r.dataset_fingerprint in md
 
 
 def test_missing_predictions_count_as_undetected():
