@@ -1,5 +1,7 @@
 # AgentInjectionBench Leaderboard
 
+Dataset SHA-256: `e7087c8ffc3ecba9ab35f7e9b9056da4499353f06596449e1ae41ea516f2d840`
+
 Ranked by **balanced accuracy** = mean of detection rate (recall on attacks) and specificity (recall on the benign control split). A flag-everything defense scores 50% here, not 100% — the benign controls make the leaderboard calibration-resistant.
 
 **MCC** (Matthews correlation) folds all four confusion cells into one score in [−1, +1]; like balanced accuracy it pins a trivial flag-everything / flag-nothing detector at 0, but it also penalises low precision, so it is the most honest single-number summary under the 142-attack / 40-benign class imbalance. Detection = attacks caught; FPR = benign wrongly flagged (lower is better); Precision = of everything flagged, the share that was a real attack; Sev-Wtd Det = detection rate weighted by severity (critical counts most). **95% CI** is the Wilson-score interval on balanced accuracy, and **MCC 95% CI** its bootstrap counterpart — MCC is non-linear in the four confusion cells, so it takes a resampling interval rather than a closed-form one — with only 142 attacks and 40 benign controls, adjacent ranks whose intervals overlap are not statistically distinguishable.

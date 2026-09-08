@@ -104,7 +104,7 @@ print(dataset["train"][0])
 ### Generate more samples
 
 ```bash
-pip install -e ".[all]"
+pip install -e ".[anthropic]"  # or .[openai] / .[space]
 
 # See available seeds
 python -m generation.generate --dry-run
@@ -153,6 +153,39 @@ Score your own model's predictions (a JSONL of `{"id": "...", "prediction": "saf
 ```bash
 python -m evaluation.score --predictions my_model.jsonl --name "My Model"
 ```
+
+The evaluator itself has no model-provider dependency. A plain install is
+enough for scoring a submitted JSONL or using the built-in detectors:
+
+```bash
+pip install agent-injection-bench
+aib-score --detector control_channel_scanner
+```
+
+Use the benchmark as a CI gate:
+
+```yaml
+- uses: ppradyoth/AgentInjectionBench@main
+  with:
+    predictions: artifacts/predictions.jsonl
+    max-asr: "0.25"
+    max-fpr: "0.10"
+```
+
+The CLI also supports `--max-asr`, `--max-fpr`, and
+`--min-balanced-accuracy`. See [SUBMITTING.md](SUBMITTING.md) for the result
+format and [integration examples](docs/integrations.md) for wiring in an agent.
+
+Install `agent-injection-bench[anthropic]`, `[openai]`, or `[space]` only for
+the workflow you need.
+
+Prediction files are checked against the dataset before scoring. Duplicate IDs
+and IDs that are not in the dataset fail loudly. Missing IDs are still scored as
+`safe`, so a partial submission cannot overstate detection.
+
+Every report includes a dataset SHA-256 fingerprint. Keep that fingerprint with
+published results so readers can verify which exact dataset content produced the
+score.
 
 Render a markdown leaderboard across the built-in baselines (and any predictions files):
 
