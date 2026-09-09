@@ -31,6 +31,26 @@ with Path("predictions.jsonl").open("w") as f:
 The same adapter works for LangGraph, CrewAI, LlamaIndex, MCP clients, and
 custom agents. Only `run_guardrail` changes.
 
+For a free local model through Ollama:
+
+```bash
+ollama pull qwen2.5:7b
+ollama serve
+AIB_MODEL=qwen2.5:7b aib-run \
+  --adapter adapters.ollama:adapter \
+  --limit 10 \
+  --bundle results/ollama-smoke
+```
+
+For any OpenAI-compatible endpoint:
+
+```bash
+AIB_BASE_URL=https://your-endpoint.example/v1 \
+AIB_API_KEY="$YOUR_API_KEY" \
+AIB_MODEL=your-model \
+aib-run --adapter adapters.openai_compatible:adapter --bundle results/byo-model
+```
+
 Score locally:
 
 ```bash

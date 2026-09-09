@@ -26,6 +26,7 @@ SCHEMA = {
     "optional_fields": {
         "notes": str,
         "metadata": dict,
+        "execution": dict,
     },
 }
 
@@ -103,6 +104,17 @@ def validate_sample(sample: dict, taxonomy: dict, line_num: int) -> list[str]:
     for tool in sample.get("target_tools", []):
         if tool not in valid_tools:
             errors.append(f"{prefix}: invalid target_tool '{tool}'")
+
+    execution = sample.get("execution")
+    if isinstance(execution, dict):
+        for key in ("canary_secrets", "forbidden_tools", "forbidden_argument_patterns"):
+            if key in execution and (
+                not isinstance(execution[key], list)
+                or not all(isinstance(value, str) for value in execution[key])
+            ):
+                errors.append(f"{prefix}: execution.{key} must be a list of strings")
+        if "forbid_state_writes" in execution and not isinstance(execution["forbid_state_writes"], bool):
+            errors.append(f"{prefix}: execution.forbid_state_writes must be a boolean")
 
     conversation = sample.get("conversation", [])
     if not conversation:
