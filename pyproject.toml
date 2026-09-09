@@ -41,6 +41,7 @@ aib-curate = "generation.curate:main"
 aib-stats = "generation.stats:main"
 aib-score = "evaluation.score:main"
 aib-leaderboard = "evaluation.leaderboard:main"
+aib-run = "runtime.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -49,7 +50,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 # The code lives in top-level packages rather than a single src/ package
 # matching the distribution name, so list them explicitly for hatchling.
-packages = ["generation", "evaluation"]
+packages = ["generation", "evaluation", "runtime"]
 force-include = {"data" = "data"}
 
 [tool.ruff]
