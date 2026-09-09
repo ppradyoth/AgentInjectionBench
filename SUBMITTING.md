@@ -14,6 +14,7 @@ Run the local checks before opening a submission:
 ```bash
 pip install agent-injection-bench
 aib-score --predictions predictions.jsonl --name "My guardrail" --json > result.json
+aib-validate --predictions predictions.jsonl
 ```
 
 Include these fields in the submission issue:

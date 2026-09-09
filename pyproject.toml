@@ -1,6 +1,6 @@
 [project]
 name = "agent-injection-bench"
-version = "0.1.0"
+version = "0.2.0"
 description = "A benchmark for evaluating prompt injection attacks in agentic tool-use pipelines"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -28,12 +28,14 @@ space = [
     "gradio>=5.0.0",
     "plotly>=5.18.0",
     "pandas>=2.1.0",
+    "pillow>=12.3.0",
 ]
 dev = [
     "ruff>=0.5.0",
     "pytest>=8.0.0",
 ]
-all = ["agent-injection-bench[anthropic,openai,space,dev]"]
+security = ["pip-audit>=2.7.0"]
+all = ["agent-injection-bench[anthropic,openai,space,dev,security]"]
 
 [project.scripts]
 aib-generate = "generation.generate:main"
@@ -42,6 +44,8 @@ aib-stats = "generation.stats:main"
 aib-score = "evaluation.score:main"
 aib-leaderboard = "evaluation.leaderboard:main"
 aib-run = "runtime.cli:main"
+aib-validate = "evaluation.validate:main"
+aib-heldout = "generation.heldout:main"
 
 [build-system]
 requires = ["hatchling"]

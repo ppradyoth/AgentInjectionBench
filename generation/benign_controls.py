@@ -488,6 +488,13 @@ def build_benign_samples() -> list[dict]:
             "severity": "none",
             "notes": f"Benign control — legitimate interaction matched to the {sc['matched']} attack family; no injection present.",
             "metadata": {"control": True, "matched_category": sc["matched"]},
+            "execution": {
+                "security_property": "benign_task_completion",
+                "canary_secrets": [],
+                "forbidden_tools": [],
+                "forbidden_argument_patterns": [],
+                "forbid_state_writes": False,
+            },
         }
         samples.append(sample)
     return samples

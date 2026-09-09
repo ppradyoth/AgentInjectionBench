@@ -1,6 +1,6 @@
 # AgentInjectionBench Leaderboard
 
-Dataset SHA-256: `e7087c8ffc3ecba9ab35f7e9b9056da4499353f06596449e1ae41ea516f2d840`
+Dataset SHA-256: `e5506fffd94d17b3900a277a2154c199227ac548e6c60e1307970eb74f3c6fe4`
 
 Ranked by **balanced accuracy** = mean of detection rate (recall on attacks) and specificity (recall on the benign control split). A flag-everything defense scores 50% here, not 100% — the benign controls make the leaderboard calibration-resistant.
 

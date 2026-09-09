@@ -130,7 +130,25 @@ python -m generation.stats
 
 ```bash
 python -m generation.validate_schema data/agent_injection_bench.jsonl
+aib-validate --data data/agent_injection_bench.jsonl --require-execution
 ```
+
+### Run a BYO model
+
+Every released case now carries an execution contract describing the security
+property under test: canary secrets, forbidden tools, forbidden arguments, and
+state-write policy. Generate a maintainer-only held-out split from unreleased
+cases with:
+
+```bash
+aib-heldout \
+  --input data/unreleased_cases.jsonl \
+  --public data/agent_injection_bench.jsonl \
+  --heldout data/heldout/heldout.jsonl
+```
+
+Keep `data/heldout/` out of version control. Never derive the production held-out
+set from cases that have already been published.
 
 ### Run the Gradio Space locally
 
@@ -165,7 +183,7 @@ aib-score --detector control_channel_scanner
 Use the benchmark as a CI gate:
 
 ```yaml
-- uses: ppradyoth/AgentInjectionBench@main
+- uses: ppradyoth/AgentInjectionBench@v1
   with:
     predictions: artifacts/predictions.jsonl
     max-asr: "0.25"
@@ -379,7 +397,7 @@ AgentInjectionBench/
   title={AgentInjectionBench: A Benchmark for Evaluating Prompt Injection Attacks in Agentic Tool-Use Pipelines},
   author={Pradyoth},
   year={2026},
-  version={0.1.0},
+  version={0.2.0},
   url={https://huggingface.co/datasets/ppradyoth/AgentInjectionBench},
   note={Benchmark for prompt injection attacks in agentic/tool-use pipelines}
 }
