@@ -13,7 +13,7 @@ jobs:
         run: python scripts/example_predictions.py --output artifacts/predictions.jsonl
 
       - name: Enforce injection-resistance thresholds
-        uses: ppradyoth/AgentInjectionBench@main
+        uses: ppradyoth/AgentInjectionBench@v1
         with:
           predictions: artifacts/predictions.jsonl
           name: Example agent

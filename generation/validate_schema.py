@@ -78,6 +78,9 @@ def validate_sample(sample: dict, taxonomy: dict, line_num: int) -> list[str]:
     if sample.get("ground_truth") not in ("safe", "unsafe"):
         errors.append(f"{prefix}: ground_truth must be 'safe' or 'unsafe'")
 
+    if "execution" in sample and not isinstance(sample["execution"], dict):
+        errors.append(f"{prefix}: execution metadata must be an object")
+
     # Benign controls (ground_truth=safe) must pin the attack-specific fields to
     # their sentinel values; attacks (ground_truth=unsafe) must not borrow the
     # benign sentinels. This keeps the two classes cleanly separable.

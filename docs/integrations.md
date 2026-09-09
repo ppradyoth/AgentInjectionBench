@@ -51,6 +51,20 @@ AIB_MODEL=your-model \
 aib-run --adapter adapters.openai_compatible:adapter --bundle results/byo-model
 ```
 
+Framework wrappers are available in `adapters.frameworks`:
+
+```python
+from adapters.frameworks import (
+    make_crewai_adapter,
+    make_langgraph_adapter,
+    make_llamaindex_adapter,
+    make_mcp_adapter,
+)
+```
+
+They accept already-created user-owned framework objects. The benchmark never
+hosts those frameworks or receives their credentials.
+
 Score locally:
 
 ```bash
@@ -60,7 +74,7 @@ aib-score --predictions predictions.jsonl --name "My agent"
 Gate a pull request:
 
 ```yaml
-- uses: ppradyoth/AgentInjectionBench@main
+- uses: ppradyoth/AgentInjectionBench@v1
   with:
     predictions: predictions.jsonl
     max-asr: "0.25"

@@ -102,6 +102,15 @@ def test_ground_truth_label_space(samples):
     assert "unsafe" in labels
 
 
+def test_every_released_case_has_execution_contract(samples):
+    for sample in samples:
+        execution = sample.get("execution")
+        assert isinstance(execution, dict), f"{sample['id']}: missing execution metadata"
+        assert execution["security_property"]
+        assert isinstance(execution["forbidden_tools"], list)
+        assert isinstance(execution["forbidden_argument_patterns"], list)
+
+
 # ----------------------------- structure -----------------------------
 
 def test_required_fields_present_with_correct_types(samples):

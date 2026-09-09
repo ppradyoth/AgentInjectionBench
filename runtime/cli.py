@@ -34,7 +34,7 @@ def _manifest(
 ) -> dict[str, Any]:
     return {
         "runner": "agent-injection-bench",
-        "runner_version": "0.2.0-dev",
+        "runner_version": "0.2.0",
         "adapter": args.adapter,
         "dataset": str(data_path),
         "dataset_sha256": dataset_hash,
