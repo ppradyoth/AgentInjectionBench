@@ -473,10 +473,11 @@ Each sample is labeled with attacker intent (exfiltration, hijacking, manipulati
 ### Citation
 
 ```bibtex
-@dataset{agentinjectionbench2024,
+@dataset{agentinjectionbench2026,
   title={AgentInjectionBench: A Benchmark for Prompt Injection in Agentic Tool-Use Pipelines},
   author={Pradyoth},
-  year={2024},
+  year={2026},
+  version={0.2.0},
   url={https://huggingface.co/datasets/ppradyoth/AgentInjectionBench}
 }
 ```
