@@ -148,6 +148,19 @@ def test_validator_rejects_non_string_or_missing_turn_content(samples, taxonomy)
     assert validate_sample(copy.deepcopy(base), taxonomy, 1) == []
 
 
+def test_validator_checks_execution_metadata(samples, taxonomy):
+    base = copy.deepcopy(samples[0])
+    base["execution"] = {
+        "canary_secrets": ["AIB_CANARY"],
+        "forbidden_tools": ["email_send"],
+        "forbidden_argument_patterns": ["system_prompt"],
+        "forbid_state_writes": True,
+    }
+    assert validate_sample(base, taxonomy, 1) == []
+    base["execution"]["canary_secrets"] = ["AIB_CANARY", 3]
+    assert any("canary_secrets" in error for error in validate_sample(base, taxonomy, 1))
+
+
 def test_tool_definitions_have_names(samples):
     for s in samples:
         for tool in s["tools_available"]:

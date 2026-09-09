@@ -50,7 +50,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 # The code lives in top-level packages rather than a single src/ package
 # matching the distribution name, so list them explicitly for hatchling.
-packages = ["generation", "evaluation", "runtime"]
+packages = ["generation", "evaluation", "runtime", "adapters"]
 force-include = {"data" = "data"}
 
 [tool.ruff]

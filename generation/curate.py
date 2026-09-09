@@ -39,6 +39,25 @@ def save_jsonl(samples: list[dict], path: Path):
             f.write(json.dumps(s, ensure_ascii=False) + "\n")
 
 
+def dataset_hash(samples: list[dict]) -> str:
+    canonical = "\n".join(
+        json.dumps(sample, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        for sample in samples
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def save_split_manifest(splits: dict[str, list[dict]], path: Path, seed: int) -> None:
+    manifest = {
+        "seed": seed,
+        "splits": {
+            name: {"count": len(items), "sha256": dataset_hash(items)}
+            for name, items in splits.items()
+        },
+    }
+    path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+
 def content_hash(sample: dict) -> str:
     conv_str = json.dumps(sample.get("conversation", []), sort_keys=True)
     return hashlib.sha256(conv_str.encode()).hexdigest()[:16]
@@ -237,6 +256,11 @@ def main():
         save_jsonl(train, splits_dir / "train.jsonl")
         save_jsonl(val, splits_dir / "validation.jsonl")
         save_jsonl(test, splits_dir / "test.jsonl")
+        save_split_manifest(
+            {"train": train, "validation": val, "test": test},
+            splits_dir / "manifest.json",
+            args.seed,
+        )
         log.info(f"Splits saved to {splits_dir}/")
 
     print_stats(samples)
