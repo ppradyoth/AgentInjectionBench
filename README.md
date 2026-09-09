@@ -375,12 +375,13 @@ AgentInjectionBench/
 ## Citation
 
 ```bibtex
-@dataset{agentinjectionbench2024,
+@dataset{agentinjectionbench2026,
   title={AgentInjectionBench: A Benchmark for Evaluating Prompt Injection Attacks in Agentic Tool-Use Pipelines},
   author={Pradyoth},
-  year={2024},
+  year={2026},
+  version={0.1.0},
   url={https://huggingface.co/datasets/ppradyoth/AgentInjectionBench},
-  note={First benchmark covering prompt injection in agentic/tool-calling contexts with attacker-intent taxonomy}
+  note={Benchmark for prompt injection attacks in agentic/tool-use pipelines}
 }
 ```
 
