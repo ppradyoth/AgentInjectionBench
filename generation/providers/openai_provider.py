@@ -1,4 +1,4 @@
-"""OpenAI provider stub — install with `pip install agent-injection-bench[openai]`."""
+"""OpenAI provider stub — install with `pip install agent-injection-benchmark[openai]`."""
 
 from generation.providers import BaseLLMProvider, register_provider
 
@@ -12,7 +12,7 @@ class OpenAIProvider(BaseLLMProvider):
         except ImportError:
             raise ImportError(
                 "OpenAI provider requires the openai package. "
-                "Install with: pip install agent-injection-bench[openai]"
+                "Install with: pip install agent-injection-benchmark[openai]"
             )
         self.model = model
         self._client = openai.OpenAI()

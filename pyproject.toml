@@ -1,5 +1,5 @@
 [project]
-name = "agent-injection-bench"
+name = "agent-injection-benchmark"
 version = "0.2.0"
 description = "A benchmark for evaluating prompt injection attacks in agentic tool-use pipelines"
 readme = "README.md"
@@ -35,7 +35,7 @@ dev = [
     "pytest>=8.0.0",
 ]
 security = ["pip-audit>=2.7.0"]
-all = ["agent-injection-bench[anthropic,openai,space,dev,security]"]
+all = ["agent-injection-benchmark[anthropic,openai,space,dev,security]"]
 
 [project.scripts]
 aib-generate = "generation.generate:main"
