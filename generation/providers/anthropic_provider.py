@@ -12,7 +12,7 @@ class AnthropicProvider(BaseLLMProvider):
         except ImportError as exc:
             raise ImportError(
                 "Anthropic provider requires the anthropic package. "
-                "Install with: pip install agent-injection-bench[anthropic]"
+                "Install with: pip install agent-injection-benchmark[anthropic]"
             ) from exc
         self.model = model
         self._client = anthropic.Anthropic()
