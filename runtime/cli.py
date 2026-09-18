@@ -33,7 +33,7 @@ def _manifest(
     count: int,
 ) -> dict[str, Any]:
     return {
-        "runner": "agent-injection-benchmark",
+        "runner": "agent-injection-benchmark-test",
         "runner_version": "0.2.0",
         "adapter": args.adapter,
         "dataset": str(data_path),

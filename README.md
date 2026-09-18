@@ -176,7 +176,7 @@ The evaluator itself has no model-provider dependency. A plain install is
 enough for scoring a submitted JSONL or using the built-in detectors:
 
 ```bash
-pip install agent-injection-benchmark
+pip install agent-injection-benchmark-test
 aib-score --detector control_channel_scanner
 ```
 
@@ -194,7 +194,7 @@ The CLI also supports `--max-asr`, `--max-fpr`, and
 `--min-balanced-accuracy`. See [SUBMITTING.md](SUBMITTING.md) for the result
 format and [integration examples](docs/integrations.md) for wiring in an agent.
 
-Install `agent-injection-benchmark[anthropic]`, `[openai]`, or `[space]` only for
+Install `agent-injection-benchmark-test[anthropic]`, `[openai]`, or `[space]` only for
 the workflow you need.
 
 Prediction files are checked against the dataset before scoring. Duplicate IDs
