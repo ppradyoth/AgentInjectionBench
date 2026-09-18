@@ -18,7 +18,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agent-injection-benchmark"
+name = "agent-injection-benchmark-test"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
@@ -62,7 +62,7 @@ space = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agent-injection-benchmark", extras = ["anthropic", "openai", "space", "dev", "security"], marker = "extra == 'all'" },
+    { name = "agent-injection-benchmark-test", extras = ["anthropic", "openai", "space", "dev", "security"], marker = "extra == 'all'" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40.0" },
     { name = "gradio", marker = "extra == 'space'", specifier = ">=5.0.0" },
     { name = "jsonschema", specifier = ">=4.20.0" },

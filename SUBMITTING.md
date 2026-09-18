@@ -12,7 +12,7 @@ as `blocked`, `allowed`, `malicious`, and `benign`.
 Run the local checks before opening a submission:
 
 ```bash
-pip install agent-injection-benchmark
+pip install agent-injection-benchmark-test
 aib-score --predictions predictions.jsonl --name "My guardrail" --json > result.json
 aib-validate --predictions predictions.jsonl
 ```
