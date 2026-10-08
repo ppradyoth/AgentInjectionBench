@@ -47,6 +47,12 @@ def run_cases(
     max_tool_calls: int = 20,
     timeout: float | None = None,
 ) -> RunResult:
+    if (
+        max_tool_calls < 1
+        or (limit is not None and limit < 1)
+        or (timeout is not None and timeout <= 0)
+    ):
+        raise ValueError("Limits and timeout must be positive")
     selected = list(cases)
     random.Random(seed).shuffle(selected)
     if limit is not None:
@@ -57,14 +63,20 @@ def run_cases(
     for case in selected:
         try:
             trace = normalize_trace(_run_adapter(adapter, case, timeout), case.id)
-            tool_call_count = sum(event.type == "tool_call" for event in trace.events)
+            tool_call_count = sum(
+                event.type == "tool_call" and event.metadata.get("source") != "history"
+                for event in trace.events
+            )
             if tool_call_count > max_tool_calls:
-                raise ValueError(
-                    f"Tool-call limit exceeded ({tool_call_count} > {max_tool_calls})"
-                )
+                trace.status = "error"
+                trace.error = f"Tool-call limit exceeded ({tool_call_count} > {max_tool_calls})"
             traces.append(trace)
+            if trace.error or trace.status != "completed":
+                errors.append({"case_id": case.id, "error": trace.error or trace.status})
         except CaseTimeout as exc:
+            traces.append(AgentTrace(case.id, status="timeout", error=str(exc)))
             errors.append({"case_id": case.id, "error": str(exc), "status": "timeout"})
         except Exception as exc:
+            traces.append(AgentTrace(case.id, status="error", error=str(exc)))
             errors.append({"case_id": case.id, "error": str(exc)})
     return RunResult(traces=traces, errors=errors)

@@ -1,4 +1,23 @@
-# Integrate your agent
+# Test the agent you ship
+
+Use this source checkout for native OpenAI Responses or Anthropic tool calling with simulated tools:
+
+```bash
+AIB_PROVIDER=OpenAI AIB_MODEL=your-model AIB_API_KEY="$OPENAI_API_KEY" \
+aib-run --adapter adapters.openai_compatible:adapter --seed 42 --limit 10 --bundle results/model-check
+```
+
+Install with `pip install -e '.[openai]'` or `pip install -e '.[anthropic]'` for the selected provider. Keep the model ID, seed, dataset fingerprint and traces when comparing changes. Provider billing applies. The sandbox executes no external actions.
+
+For your production agent, return an `AgentTrace` with each generated `model_message`, `tool_call` (name and arguments), `tool_result`, and `state_write`. Mark input and replayed events with `metadata={"source": "history"}`. Return partial traces with `status="error"`, `"timeout"` or `"incomplete"` when a run fails so earlier violations remain inspectable.
+
+`task_completed` and `task_blocked` default to `None`. Set them only from your trusted task evaluator; an empty trace, clean contract check, refusal phrase, or model claim is not task evidence. Use `metadata={"tool_trace_complete": False, "state_trace_complete": False}` when your integration only captures text. Such traces cannot pass checks that require unavailable action or state evidence.
+
+The Space uses this same runner and grader, with native tool messages, reference answers removed, 8 tool calls per case, and a time budget checked between requests. It samples attacks plus benign controls. Security rates use evaluated attacks only and show coverage; completion and blocking stay n/a until measured. Broad argument substring matches require trace review.
+
+Framework convenience wrappers provide partial evidence. They can expose an observed violation but cannot establish that unobserved tool or state behavior was safe. Use a full trace adapter for that.
+
+`--offline` is reserved for `runtime.reference:adapter`, which replays dataset fixtures and produces no model-security score. It is not network isolation for arbitrary adapters.
 
 The adapter contract is deliberately small. Run every benchmark sample through
 your agent or guardrail and write one row containing the sample ID and a binary
