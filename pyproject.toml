@@ -23,9 +23,9 @@ dependencies = [
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.40.0"]
-openai = ["openai>=1.50.0"]
+openai = ["openai>=1.66.0"]
 space = [
-    "gradio>=5.0.0",
+    "gradio>=6.29.1,<7",
     "plotly>=5.18.0",
     "pandas>=2.1.0",
     "pillow>=12.3.0",

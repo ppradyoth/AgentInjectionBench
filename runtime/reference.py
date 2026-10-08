@@ -27,6 +27,7 @@ def adapter(case: Case) -> AgentTrace:
                 content=content,
                 tool=turn.get("tool"),
                 arguments=turn.get("arguments"),
+                metadata={"source": "history"},
             )
         )
     return AgentTrace(case_id=case.id, events=events)

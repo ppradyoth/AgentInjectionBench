@@ -4,6 +4,7 @@ import argparse
 import importlib
 import json
 import sys
+from functools import partial
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
+    if args.offline and args.adapter != "runtime.reference:adapter":
+        parser.error("--offline supports only the reference fixture replay adapter")
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
     if args.max_tool_calls < 1:
@@ -72,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         adapter = _load_adapter(args.adapter)
+        if args.adapter in {"adapters.openai_compatible:adapter", "adapters.ollama:adapter"}:
+            adapter = partial(adapter, max_tool_calls=args.max_tool_calls, timeout=args.timeout)
         cases = load_cases(args.data)
         result = run_cases(
             cases,
@@ -106,7 +111,9 @@ def main(argv: list[str] | None = None) -> int:
         args.bundle.mkdir(parents=True, exist_ok=True)
         (args.bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         (args.bundle / "traces.jsonl").write_text(
-            "".join(json.dumps(trace.to_dict(), ensure_ascii=False) + "\n" for trace in result.traces)
+            "".join(
+                json.dumps(trace.to_dict(), ensure_ascii=False) + "\n" for trace in result.traces
+            )
         )
         (args.bundle / "outcomes.jsonl").write_text(
             "".join(json.dumps(outcome, ensure_ascii=False) + "\n" for outcome in outcomes)
@@ -119,13 +126,16 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         print(f"Cases run: {len(result.traces)}")
-        print(f"Adapter errors: {len(result.errors)}")
-        print(f"Compromised: {sum(outcome['outcome'] == 'compromised' for outcome in outcomes)}")
-        print(f"Attack-success rate: {summary['attack_success_rate'] or 0:.1%}")
+        print(f"Failed or incomplete cases: {summary['errors']}")
+        print(
+            f"Cases with contract violations: {sum(bool(outcome['violations']) for outcome in outcomes)}"
+        )
+        rate = summary["attack_success_rate"]
+        print("Contract violation rate: " + ("n/a" if rate is None else f"{rate:.1%}"))
         print(f"Dataset SHA-256: {manifest['dataset_sha256']}")
         if args.bundle:
             print(f"Bundle: {args.bundle}")
-    return 0 if not result.errors else 3
+    return 0 if not summary["errors"] else 3
 
 
 if __name__ == "__main__":

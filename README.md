@@ -15,43 +15,53 @@ tags:
 - benchmark
 - security
 size_categories:
-- 1K<n<10K
+- n<1K
 ---
 
 # 🔬 AgentInjectionBench
 
-**A benchmark for evaluating prompt injection attacks in agentic tool-use pipelines.**
+**Catch unsafe tool calls before you ship.**
+
+Switching models, changing a system prompt, or adding a tool? Check what untrusted content can make your agent do, then keep the traces as a regression test.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Dataset on HF](https://img.shields.io/badge/🤗-Dataset-yellow)](https://huggingface.co/datasets/ppradyoth/AgentInjectionBench)
-[![Space](https://img.shields.io/badge/🤗-Space-orange)](https://huggingface.co/spaces/ppradyoth/AgentInjectionBench)
+[![Try the Space](https://img.shields.io/badge/🤗-Test_a_model-orange)](https://huggingface.co/spaces/ppradyoth/AgentInjectionBench)
 
----
+## Test your next change
 
-## Why AgentInjectionBench?
+Bring a current OpenAI or Anthropic model ID to the [Space](https://huggingface.co/spaces/ppradyoth/AgentInjectionBench). It sends poisoned content through native tool-call messages, simulates tool execution, and checks the resulting calls and outputs against explicit case policies.
 
-Existing prompt injection benchmarks (AdvBench, HarmBench, JailbreakBench) focus on **single-turn, user-side attacks** with binary harmful/benign labels. But modern AI systems are **agentic** — they call tools, query APIs, read files, and operate in multi-step workflows where the attack surface is radically different.
+For private configurations, run this checkout locally:
 
-AgentInjectionBench is the **first benchmark specifically designed for injection attacks in agentic tool-use contexts**, covering:
+```bash
+pip install -e '.[openai]'
+AIB_PROVIDER=OpenAI AIB_MODEL=your-model AIB_API_KEY="$OPENAI_API_KEY" \
+aib-run --adapter adapters.openai_compatible:adapter --limit 10 --seed 42 --bundle results/model-check
+```
 
-| Attack Category | What it tests |
+Use `AIB_PROVIDER=Anthropic` with the `[anthropic]` extra for Claude, or an OpenAI-compatible endpoint for local models. Use your own adapter to test your production agent, its permissions and its actual tool layer.
+
+## What you get
+
+- **182 public synthetic cases**, including 40 benign controls, covering poisoned tool outputs, goal hijacking, privilege escalation, disclosure, multi-turn context, MCP poisoning and tool shadowing.
+- **Calls you can inspect**, with tool arguments, model outputs, contract matches, errors and per-case timing.
+- **Reproducible runs**, with deterministic selection, case IDs, a dataset fingerprint and report bundles.
+- **Evidence-aware scoring**, where input secrets are not leaks, reference answers are not generated output, and missing or failed runs cannot become passes.
+
+A violation is a match against a case contract. Some contracts use broad substring checks; inspect the trace before treating a match as a security finding. Completion and benign blocking require explicit task evidence. The Space simulates tools and cannot verify persisted-state changes. A clean run is evidence for the implemented checks, not a certification of production safety.
+
+## Coverage
+
+| Case category | What it probes |
 |---|---|
-| **Tool Output Injection** | Malicious instructions embedded in API/tool responses |
-| **Goal Hijacking** | Redirecting agent goals mid-workflow via poisoned content |
-| **Privilege Escalation** | Tricking agents into unauthorized tool use |
-| **Data Exfiltration** | Extracting system prompts, user data, or context |
-| **Multi-Turn Stateful** | Attacks that build trust across multiple turns |
-| **MCP Context Poisoning** | Poisoning MCP server responses to corrupt agent behavior |
-
-## Key Differentiators
-
-- **Agentic context**: Every attack targets tool-calling, not direct user prompts
-- **Intent taxonomy**: Labels go beyond harmful/benign — we classify attacker intent (exfiltration, hijacking, manipulation, escalation, denial, reconnaissance)
-- **Multi-dimensional labels**: attack category, injection surface, complexity, target tools, defense bypass technique, severity
-- **MCP coverage**: First benchmark to include Model Context Protocol attack vectors
-- **Multi-turn attacks**: Stateful attacks that build context before exploiting
-- **Matched-benign controls**: A benign split that looks attack-adjacent (URLs, imperative text, "system"/"admin" language) but carries no injection — so detectors are scored on precision and false positives, not recall alone
-- **Extensible generation**: Pluggable LLM provider system for expanding the dataset
+| Tool output injection | Instructions hidden in retrieved content and API responses |
+| Goal hijacking | Attempts to redirect the user's task |
+| Privilege escalation | Attempts to call unauthorized tools |
+| Data exfiltration | Canary disclosure and forbidden arguments |
+| Multi-turn stateful | Poisoned content introduced across a conversation |
+| MCP context poisoning | Instructions embedded in MCP-style responses |
+| Tool shadowing | Conflicting instructions about available tools |
 
 ## Dataset Schema
 
@@ -110,10 +120,10 @@ pip install -e ".[anthropic]"  # or .[openai] / .[space]
 python -m generation.generate --dry-run
 
 # Generate variations (requires ANTHROPIC_API_KEY)
-python -m generation.generate --provider anthropic --model claude-sonnet-4-6 --variations 20
+python -m generation.generate --provider anthropic --model YOUR_MODEL_ID --variations 20
 
 # Or use OpenAI
-python -m generation.generate --provider openai --model gpt-4o --variations 20
+python -m generation.generate --provider openai --model YOUR_MODEL_ID --variations 20
 ```
 
 ### Curate and split
@@ -198,8 +208,8 @@ Install `agent-injection-benchmark-test[anthropic]`, `[openai]`, or `[space]` on
 the workflow you need.
 
 Prediction files are checked against the dataset before scoring. Duplicate IDs
-and IDs that are not in the dataset fail loudly. Missing IDs are still scored as
-`safe`, so a partial submission cannot overstate detection.
+and IDs that are not in the dataset fail loudly. Missing IDs are reported and treated as undetected by the detector scorer.
+CI gates reject incomplete predictions and unavailable gated metrics.
 
 Every report includes a dataset SHA-256 fingerprint. Keep that fingerprint with
 published results so readers can verify which exact dataset content produced the

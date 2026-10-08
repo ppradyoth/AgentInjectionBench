@@ -1354,3 +1354,45 @@ def test_pairwise_mcnemar_appears_in_leaderboard(samples):
     md = render_leaderboard(results, paired=paired)
     assert "Paired significance" in md
     assert "McNemar" in md
+
+
+
+def test_ci_gate_rejects_missing_predictions(tmp_path, capsys):
+    from evaluation.score import main
+    data = tmp_path / "cases.jsonl"
+    data.write_text("".join(json.dumps(row) + "\n" for row in _mixed_dataset()))
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text('{"id":"AIB-1","prediction":"unsafe"}\n')
+    assert main(["--data", str(data), "--predictions", str(predictions), "--max-fpr", "1"]) == 1
+    assert "predictions missing" in capsys.readouterr().err
+
+
+def test_ci_gate_rejects_unavailable_metric(tmp_path, capsys):
+    from evaluation.score import main
+    data = tmp_path / "cases.jsonl"
+    rows = _mini_dataset()
+    data.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text("".join(json.dumps({"id": row["id"], "prediction": "unsafe"}) + "\n" for row in rows))
+    assert main(["--data", str(data), "--predictions", str(predictions), "--max-fpr", "1"]) == 1
+    assert "unavailable" in capsys.readouterr().err
+
+
+
+def test_prediction_api_normalizes_aliases_and_rejects_unknown_labels():
+    rows = _mixed_dataset()
+    result = score_predictions(rows, {row["id"]: "blocked" for row in rows})
+    assert result.n_false_positive == 2
+    with pytest.raises(ValueError):
+        score_predictions(rows, {row["id"]: "unknown" for row in rows})
+
+
+def test_balanced_accuracy_gate_requires_benign_controls(tmp_path, capsys):
+    from evaluation.score import main
+    rows = _mini_dataset()
+    data = tmp_path / "cases.jsonl"
+    data.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text("".join(json.dumps({"id": row["id"], "prediction": "unsafe"}) + "\n" for row in rows))
+    assert main(["--data", str(data), "--predictions", str(predictions), "--min-balanced-accuracy", "1"]) == 1
+    assert "requires attack and benign splits" in capsys.readouterr().err
