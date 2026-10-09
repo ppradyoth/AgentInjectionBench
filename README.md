@@ -30,6 +30,8 @@ AgentInjectionBench gives you repeatable cases for that decision. Run your chose
 
 **[Test your model in the live Space](https://huggingface.co/spaces/ppradyoth/AgentInjectionBench)** · [Run locally](#run-locally) · [Connect your agent](#test-the-agent-you-actually-ship)
 
+Open the Space's **Dataset Explorer** tab to inspect the cases without an API key. Model tests use your provider key. The local runner lets you keep private configurations on your machine.
+
 **182 public synthetic cases · 142 attacks · 40 benign controls · 7 attack categories · Apache 2.0**
 
 [![Tests](https://github.com/ppradyoth/AgentInjectionBench/actions/workflows/tests.yml/badge.svg)](https://github.com/ppradyoth/AgentInjectionBench/actions/workflows/tests.yml)
