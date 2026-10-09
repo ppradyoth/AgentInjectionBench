@@ -93,7 +93,7 @@ aib-score --predictions predictions.jsonl --name "My agent"
 Gate a pull request:
 
 ```yaml
-- uses: ppradyoth/AgentInjectionBench@v1
+- uses: ppradyoth/AgentInjectionBench@2c7bdbbd60b9f9a1c05bd705ed1ac83965943789
   with:
     predictions: predictions.jsonl
     max-asr: "0.25"
